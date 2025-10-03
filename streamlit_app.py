@@ -1,96 +1,108 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import openai
-import os
 
-st.set_page_config(page_title="Battery SOH Chatbot", page_icon="🔋", layout="wide")
-st.title("🔋 Battery SOH Prediction & Chatbot")
+# ---------------------------
+# STREAMLIT APP CONFIG
+# ---------------------------
+st.set_page_config(page_title="🔋 Battery SOH Chatbot", layout="wide")
 
-# ------------------------------
-# 1. Upload Dataset
-# ------------------------------
-uploaded_file = st.file_uploader("📂 Upload PulseBat CSV dataset", type=["csv"])
+st.title("🔋 Battery Pack SOH Prediction & Chatbot")
+st.markdown("Upload your dataset, predict **SOH**, and ask battery-related questions!")
+
+# ---------------------------
+# FILE UPLOAD
+# ---------------------------
+uploaded_file = st.file_uploader("📂 Upload your dataset (.csv or .xlsx)", type=["csv", "xlsx"])
 
 if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    st.write("### Preview of Uploaded Data")
+    # Read file
+    if uploaded_file.name.endswith(".csv"):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+
+    st.write("### Preview of Dataset")
     st.dataframe(df.head())
 
-    # Ensure dataset has expected columns
-    # Example assumption: U1, U2, ..., U21, SOH
-    feature_cols = [col for col in df.columns if col.startswith("U")]
-    target_col = "SOH"
-
-    if target_col in df.columns and len(feature_cols) == 21:
-        X = df[feature_cols]
+    # ---------------------------
+    # MODEL TRAINING
+    # ---------------------------
+    if "soh" not in df.columns.str.lower():
+        st.error("❌ Dataset must contain an 'SOH' column as the target variable.")
+    else:
+        # Identify target column (case-insensitive)
+        target_col = [c for c in df.columns if c.lower() == "soh"][0]
+        X = df.drop(columns=[target_col])
         y = df[target_col]
 
-        # Train model
+        # Train-test split
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Train Linear Regression
         model = LinearRegression()
-        model.fit(X, y)
+        model.fit(X_train, y_train)
 
-        st.success("✅ Model trained successfully using uploaded dataset!")
+        # Evaluate
+        y_pred = model.predict(X_test)
+        st.write("### 📊 Model Evaluation")
+        st.write(f"**R² Score:** {r2_score(y_test, y_pred):.3f}")
+        st.write(f"**MSE:** {mean_squared_error(y_test, y_pred):.3f}")
+        st.write(f"**MAE:** {mean_absolute_error(y_test, y_pred):.3f}")
 
-        # ------------------------------
-        # 2. Prediction Function
-        # ------------------------------
-        def predict_soh(cells, threshold=0.6):
-            soh = model.predict([cells])[0]
-            status = "✅ Healthy" if soh >= threshold else "⚠️ Problem"
-            return soh, status
+        # ---------------------------
+        # USER INPUTS
+        # ---------------------------
+        st.subheader("🔢 Enter Battery Cell Features for Prediction")
 
-        # ------------------------------
-        # 3. ChatGPT Integration
-        # ------------------------------
-        def ask_chatgpt(prompt):
-            try:
-                client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                return f"⚠️ ChatGPT Error: {e}"
+        user_inputs = {}
+        for col in X.columns:
+            col_min = float(df[col].min())
+            col_max = float(df[col].max())
+            col_mean = float(df[col].mean())
 
-        # ------------------------------
-        # 4. Tabs Layout
-        # ------------------------------
-        tab1, tab2 = st.tabs(["🔮 Predict Battery SOH", "💬 Chat with Battery Bot"])
+            user_inputs[col] = st.number_input(
+                f"{col}",
+                col_min,
+                col_max,
+                col_mean,
+                step=(col_max - col_min) / 100 if col_max > col_min else 0.01
+            )
 
-        # ---- Tab 1: Prediction ----
-        with tab1:
-            st.subheader("Enter SOH values for cells U1–U21")
+        if st.button("⚡ Predict SOH"):
+            input_df = pd.DataFrame([user_inputs])
+            soh_pred = model.predict(input_df)[0]
 
-            cells = []
-            cols = st.columns(7)
-            for i, col in enumerate(feature_cols):
-                with cols[i % 7]:
-                    val = st.number_input(f"{col}", 0.0, 1.0, float(df[col].mean()), step=0.01)
-                    cells.append(val)
+            st.success(f"🔮 Predicted SOH: **{soh_pred:.3f}**")
 
-            threshold = st.slider("SOH Threshold", 0.1, 1.0, 0.6, step=0.05)
+            if soh_pred < 0.6:
+                st.error("🚨 The battery has a problem.")
+            else:
+                st.success("✅ The battery is healthy.")
 
-            if st.button("🔍 Predict"):
-                soh, status = predict_soh(cells, threshold)
-                st.metric("Predicted Pack SOH", f"{soh:.2f}")
-                st.success(f"Battery Status: {status}")
+        # ---------------------------
+        # CHATBOT SECTION
+        # ---------------------------
+        st.subheader("🤖 Battery Chatbot")
 
-        # ---- Tab 2: Chatbot ----
-        with tab2:
-            st.subheader("Ask me about batteries 🔋")
-            user_input = st.text_input("Your question:")
+        openai.api_key = st.secrets.get("OPENAI_API_KEY", None)
 
-            if st.button("💡 Ask"):
-                if user_input.strip():
-                    reply = ask_chatgpt(user_input)
-                    st.markdown(f"**Chatbot:** {reply}")
-                else:
-                    st.warning("Please enter a question.")
-    else:
-        st.error("⚠️ The dataset must have columns: U1–U21 and SOH")
-else:
-    st.info("👆 Upload your PulseBat dataset (.csv) to get started.")
+        if not openai.api_key:
+            st.warning("⚠️ No OpenAI API key found. Add it in `.streamlit/secrets.toml`.")
+        else:
+            user_question = st.text_input("Ask a battery-related question:")
+
+            if user_question:
+                with st.spinner("Thinking..."):
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "You are a helpful assistant for battery health and recycling."},
+                            {"role": "user", "content": user_question}
+                        ]
+                    )
+                    st.write("💡 Answer:", response["choices"][0]["message"]["content"])
