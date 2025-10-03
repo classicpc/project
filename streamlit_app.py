@@ -2,145 +2,131 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
-import os
-import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
-from openai import OpenAI
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+import openai
 
-# ===============================
-# Load and preprocess dataset
-# ===============================
+# -------------------------------
+# Streamlit Page Config
+# -------------------------------
+st.set_page_config(
+    page_title="Battery SOH Chatbot",
+    page_icon="🔋",
+    layout="centered"
+)
+
+st.title("🔋 Battery Pack SOH Chatbot")
+st.markdown("Upload the **PulseBat Dataset** and chat with the battery assistant.")
+
+# -------------------------------
+# File Upload
+# -------------------------------
+uploaded_file = st.file_uploader("Upload PulseBat Dataset (.csv)", type=["csv"])
+
+# -------------------------------
+# Chat Memory
+# -------------------------------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# -------------------------------
+# Load Data
+# -------------------------------
 @st.cache_data
-def load_data():
-    df = pd.read_csv("PulseBat Dataset.csv")  # ensure the file is uploaded in same directory
-    return df
+def load_data(file):
+    return pd.read_csv(file)
 
-df = load_data()
+# -------------------------------
+# Train Linear Regression
+# -------------------------------
+def train_model(df):
+    feature_cols = [col for col in df.columns if col.startswith("U")]  # U1–U21
+    X = df[feature_cols]
+    y = df["SOH"]
 
-# Features: U1–U21 cells, Target: SOH
-cell_cols = [col for col in df.columns if col.startswith("U")]
-X = df[cell_cols]
-y = df["SOH"]
+    model = LinearRegression()
+    model.fit(X, y)
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    y_pred = model.predict(X)
+    metrics = {
+        "R²": r2_score(y, y_pred),
+        "MSE": mean_squared_error(y, y_pred),
+        "MAE": mean_absolute_error(y, y_pred)
+    }
+    return model, metrics
 
-# Train Linear Regression model
-model = LinearRegression()
-model.fit(X_train, y_train)
+# -------------------------------
+# Battery Health Classification
+# -------------------------------
+def classify_soh(soh_value, threshold=0.6):
+    if soh_value < threshold:
+        return "⚠️ The battery has a problem."
+    else:
+        return "✅ The battery is healthy."
 
-# Predictions for evaluation
-y_pred = model.predict(X_test)
+# -------------------------------
+# ChatGPT Integration
+# -------------------------------
+def ask_chatgpt(prompt):
+    try:
+        openai.api_key = st.secrets["OPENAI_API_KEY"]  # Add your key in Streamlit secrets
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "system", "content": "You are a helpful assistant for battery health questions."},
+                      {"role": "user", "content": prompt}]
+        )
+        return response["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"❌ ChatGPT error: {str(e)}"
 
-# ===============================
-# Streamlit UI
-# ===============================
-st.set_page_config(page_title="Battery SOH Chatbot", layout="wide")
+# -------------------------------
+# Main App Logic
+# -------------------------------
+if uploaded_file is not None:
+    df = load_data(uploaded_file)
+    st.success("✅ Dataset loaded successfully!")
 
-st.title("🔋 Battery Pack SOH Prediction & Chatbot")
-st.write("Predict battery State of Health (SOH) and chat about batteries.")
-
-# Show dataset
-with st.expander("📂 View Dataset"):
+    st.write("### Dataset Preview")
     st.dataframe(df.head())
 
-# ===============================
-# Model Evaluation
-# ===============================
-st.subheader("📊 Model Evaluation")
-r2 = r2_score(y_test, y_pred)
-mse = mean_squared_error(y_test, y_pred)
-mae = mean_absolute_error(y_test, y_pred)
+    # Train Model
+    model, metrics = train_model(df)
 
-st.metric("R² Score", f"{r2:.3f}")
-st.metric("MSE", f"{mse:.3f}")
-st.metric("MAE", f"{mae:.3f}")
+    st.write("### Model Performance")
+    st.json(metrics)
 
-# Plot predicted vs actual
-fig, ax = plt.subplots()
-ax.scatter(y_test, y_pred, alpha=0.6, edgecolors="k")
-ax.plot([y.min(), y.max()], [y.min(), y.max()], "r--", lw=2)
-ax.set_xlabel("Actual SOH")
-ax.set_ylabel("Predicted SOH")
-ax.set_title("Predicted vs Actual SOH")
-st.pyplot(fig)
+    # ---------------------------
+    # Chatbot Section
+    # ---------------------------
+    st.write("### 💬 Chat with the Battery Assistant")
 
-# ===============================
-# Prediction Section
-# ===============================
-st.subheader("⚡ Check Battery SOH")
+    user_input = st.chat_input("Ask something like 'Check battery SOH' or 'How to extend battery life?'")
 
-# Threshold slider
-threshold = st.slider("Set SOH Threshold", 0.0, 1.0, 0.6, 0.01)
+    if user_input:
+        # Save user message
+        st.session_state.chat_history.append(("user", user_input))
 
-# User input for each cell
-with st.form("prediction_form"):
-    st.write("Enter cell values (U1–U21):")
-    inputs = []
-    cols = st.columns(3)
-    for i, col in enumerate(cell_cols):
-        val = cols[i % 3].number_input(
-            col, 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=float(df[col].mean()), 
-            step=0.01
-        )
-        inputs.append(val)
-    submitted = st.form_submit_button("Predict SOH")
+        # Process "check battery SOH"
+        if "soh" in user_input.lower():
+            random_sample = df.sample(1).drop(columns=["SOH"])  # pick a random row
+            predicted_soh = model.predict(random_sample)[0]
+            health_status = classify_soh(predicted_soh)
 
-if submitted:
-    features = np.array(inputs).reshape(1, -1)
-    soh_pred = model.predict(features)[0]
-    st.success(f"Predicted SOH: {soh_pred:.3f}")
-    if soh_pred < threshold:
-        st.error("The battery has a problem ⚠️")
-    else:
-        st.success("The battery is healthy ✅")
+            bot_reply = f"🔮 Predicted SOH: **{predicted_soh:.2f}**\n\n{health_status}"
 
-# ===============================
-# Chatbot Section
-# ===============================
-st.subheader("💬 Battery Chatbot")
+        else:
+            # General Q&A via ChatGPT
+            bot_reply = ask_chatgpt(user_input)
 
-# Load OpenAI API
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        # Save bot reply
+        st.session_state.chat_history.append(("bot", bot_reply))
 
-# Maintain chat history
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [
-        {"role": "system", "content": "You are a helpful assistant specialized in batteries."}
-    ]
+    # Display chat history
+    for role, message in st.session_state.chat_history:
+        if role == "user":
+            st.chat_message("user").markdown(message)
+        else:
+            st.chat_message("assistant").markdown(message)
 
-# Display chat history
-for msg in st.session_state.messages:
-    if msg["role"] != "system":
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-# Chat input
-if prompt := st.chat_input("Ask me about batteries..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=st.session_state.messages
-            )
-            reply = response.choices[0].message.content
-            st.markdown(reply)
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-
-# ===============================
-# Save Model Option
-# ===============================
-with st.expander("💾 Save Model"):
-    if st.button("Export trained model"):
-        joblib.dump(model, "linear_regression_model.pkl")
-        st.success("Model saved as linear_regression_model.pkl")
+else:
+    st.info("📂 Please upload the PulseBat Dataset CSV file to start.")
