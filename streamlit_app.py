@@ -4,7 +4,12 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-import openai
+from openai import OpenAI
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # -------------------------------
 # Streamlit Page Config
@@ -69,13 +74,17 @@ def classify_soh(soh_value, threshold=0.6):
 # -------------------------------
 def ask_chatgpt(prompt):
     try:
-        openai.api_key = st.secrets["OPENAI_API_KEY"]  # Add your key in Streamlit secrets
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return "❌ OpenAI API key not found. Please set OPENAI_API_KEY in your .env file."
+        
+        client = OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
             messages=[{"role": "system", "content": "You are a helpful assistant for battery health questions."},
                       {"role": "user", "content": prompt}]
         )
-        return response["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
     except Exception as e:
         return f"❌ ChatGPT error: {str(e)}"
 
