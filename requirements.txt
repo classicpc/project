@@ -7,3 +7,4 @@ joblib
 openai
 openpyxl
 python-dotenv
+plotly
