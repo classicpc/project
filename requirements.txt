@@ -6,3 +6,5 @@ matplotlib
 joblib
 openai
 openpyxl
+plotly
+seaborn
