@@ -26,7 +26,7 @@ warnings.filterwarnings('ignore')
 # -------------------------------
 # NOTE: The API key is hardcoded for convenience per user request.
 # Do NOT commit real secrets to public repos.
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = ""
 
 # -------------------------------
 # Page Configuration
