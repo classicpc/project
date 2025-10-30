@@ -22,6 +22,13 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # -------------------------------
+# Internal API Configuration
+# -------------------------------
+# NOTE: The API key is hardcoded for convenience per user request.
+# Do NOT commit real secrets to public repos.
+OPENAI_API_KEY = "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"
+
+# -------------------------------
 # Page Configuration
 # -------------------------------
 st.set_page_config(
@@ -103,9 +110,8 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>🔋 Battery Pack SOH Prediction Platform</h1>
-    <h3>SOFE3370 Final Project - Group 18</h3>
-    <p>Linear Regression & AI-Powered Battery Health Assessment</p>
-    <p><strong>Team:</strong> Pranav Ashok Chaudhari, Tarun Modekurty, Leela Alagala, Hannah Albi</p>
+    <h3>AI-Powered Battery Health Assessment</h3>
+    <p>State-of-the-art analytics, predictions, and an expert assistant — all in one app.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -148,19 +154,7 @@ with st.sidebar:
         random_state = st.number_input("Random State", 1, 100, 42)
     
     st.markdown("---")
-    
-    # API Configuration
-    st.markdown("### 🔑 API Configuration")
-    api_key = st.text_input(
-        "OpenAI API Key", 
-        type="password",
-        help="Enter your OpenAI API key for ChatGPT integration"
-    )
-    
-    if api_key:
-        st.success("✅ API Key configured")
-    else:
-        st.warning("⚠️ API Key required for AI Assistant")
+
 
 # -------------------------------
 # Chat Memory and RAG System
@@ -383,7 +377,11 @@ def ask_chatgpt_rag(prompt, context_data=None, api_key=None):
     # RAG: Retrieve relevant context from knowledge base
     retrieved_context = retrieve_relevant_context(prompt)
     
-    if not api_key:
+    # Use internal API key if none provided
+    if api_key is None:
+        api_key = OPENAI_API_KEY
+
+    if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
         # Fallback response using RAG knowledge base
         if retrieved_context:
             return f"""## 🧠 RAG Knowledge Base Response
@@ -391,11 +389,11 @@ def ask_chatgpt_rag(prompt, context_data=None, api_key=None):
 {retrieved_context}
 
 ---
-*Note: Add your OpenAI API key in the sidebar for enhanced AI responses.*"""
+*Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
         else:
             return """## ❌ OpenAI API key not configured
 
-Please add your API key in the sidebar for AI-powered responses.
+Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
 ### Available without API key:
 - Battery analysis and SOH predictions
@@ -446,7 +444,11 @@ def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
     # RAG: Retrieve relevant context from knowledge base
     retrieved_context = retrieve_relevant_context(prompt)
     
-    if not api_key:
+    # Use internal API key if none provided
+    if api_key is None:
+        api_key = OPENAI_API_KEY
+
+    if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
         # Fallback response using RAG knowledge base
         if retrieved_context:
             response = f"""## 🧠 RAG Knowledge Base Response
@@ -454,11 +456,11 @@ def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
 {retrieved_context}
 
 ---
-*Note: Add your OpenAI API key in the sidebar for enhanced AI responses.*"""
+*Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
         else:
             response = """## ❌ OpenAI API key not configured
 
-Please add your API key in the sidebar for AI-powered responses.
+Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
 ### Available without API key:
 - Battery analysis and SOH predictions
@@ -963,7 +965,7 @@ The model uses U1-U21 cell voltage data to predict overall battery pack health. 
                         - Sorting Method: {sort_method}"""
                     
                     # Stream the response
-                    response = st.write_stream(stream_chatgpt_rag(user_message, context_data, api_key))
+                    response = st.write_stream(stream_chatgpt_rag(user_message, context_data))
                     
                     # Add feedback controls for streaming response
                     show_feedback_controls(len(st.session_state.battery_messages))
@@ -976,10 +978,10 @@ else:
     st.markdown("""
     ## 🚀 Welcome to Battery Pack SOH Prediction Platform
     
-    ### Project Overview
+    ### Overview
     
-    This platform implements a comprehensive battery State of Health (SOH) prediction system using Linear Regression 
-    and AI-powered analysis, developed for the SOFE3370 Final Project.
+    This platform delivers a comprehensive battery State of Health (SOH) prediction system using Linear Regression
+    plus an AI-powered assistant for expert analysis.
     
     ### Key Features
     
@@ -993,7 +995,7 @@ else:
     
     📈 **Rich Visualizations**: Interactive charts showing predicted vs actual SOH, residuals, and distributions
     
-    💬 **AI Assistant**: ChatGPT-powered assistant for battery insights and maintenance tips
+    💬 **AI Assistant**: Expert assistant for battery insights and maintenance tips
     
     ### Getting Started:
     1. 📁 Upload your PulseBat CSV file using the sidebar
@@ -1040,8 +1042,7 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 2rem;">
-    <p><strong>SOFE3370 Final Project - Group 18</strong></p>
-    <p>Battery Pack SOH Prediction using Linear Regression & Chatbot Integration</p>
-    <p>Pranav Ashok Chaudhari | Tarun Modekurty | Leela Alagala | Hannah Albi</p>
+    <p><strong>Battery Pack SOH Prediction Platform</strong></p>
+    <p>Linear Regression, rich analytics, and an AI assistant.</p>
 </div>
 """, unsafe_allow_html=True)
