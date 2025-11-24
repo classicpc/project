@@ -37,64 +37,429 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional UI (enhanced)
+# Custom CSS for exceptional UI
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* Global Styles */
+html, body, [class*="css"] { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+}
+
+/* Hide Streamlit branding */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+.stDeployButton { display: none; }
+
+/* Smooth animations */
+* { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* Main Header - Stunning gradient with animation */
 .main-header {
-    background: linear-gradient(90deg, #0f172a 0%, #0f3460 60%, #1e3c72 100%);
-    padding: 2rem 1.5rem;
-    border-radius: 14px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 100%);
+    background-size: 300% 300%;
+    animation: gradient-shift 15s ease infinite;
+    padding: 3rem 2rem;
+    border-radius: 20px;
     text-align: center;
-    margin-bottom: 1.75rem;
+    margin-bottom: 2rem;
     color: #ffffff;
-    box-shadow: 0 8px 30px rgba(5, 15, 40, 0.15);
+    box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3), 0 0 0 1px rgba(255,255,255,0.1) inset;
+    position: relative;
+    overflow: hidden;
 }
-.main-header h1 { margin: 0; font-weight: 700; letter-spacing: -0.5px; }
-.main-header h3 { margin: 0.25rem 0 0.5rem 0; font-weight: 500; color: rgba(255,255,255,0.9); }
-.main-header p { margin: 0; color: rgba(255,255,255,0.85); }
 
+.main-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.main-header h1 { 
+    margin: 0; 
+    font-weight: 800; 
+    letter-spacing: -1px; 
+    font-size: 2.5rem;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.2);
+    position: relative;
+    z-index: 1;
+}
+
+.main-header h3 { 
+    margin: 0.5rem 0; 
+    font-weight: 500; 
+    color: rgba(255,255,255,0.95); 
+    font-size: 1.3rem;
+    position: relative;
+    z-index: 1;
+}
+
+.main-header p { 
+    margin: 0.5rem 0 0 0; 
+    color: rgba(255,255,255,0.9);
+    font-size: 1.05rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Glassmorphism Cards */
 .uploader-card {
-    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-    padding: 0.85rem;
-    border-radius: 10px;
-    color: #0f172a;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    padding: 1.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+    margin-bottom: 1.5rem;
 }
-.sidebar-section { background: #ffffff; padding: 0.75rem; border-radius: 10px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04); margin-bottom: 1rem; }
 
+.sidebar-section { 
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    padding: 1.25rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+    margin-bottom: 1.5rem;
+}
+
+/* Enhanced Metric Cards */
 .metric-card {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 1rem;
-    border-radius: 10px;
+    padding: 1.5rem;
+    border-radius: 16px;
     color: white;
     text-align: center;
-    margin: 0.5rem 0;
-    box-shadow: 0 4px 12px rgba(102,126,234,0.12);
+    margin: 0.75rem 0;
+    box-shadow: 0 10px 30px rgba(102,126,234,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    transform: translateY(0);
 }
 
-.health-good { background: linear-gradient(135deg, #16a34a 0%, #52b788 100%); color: white; padding: 0.8rem; border-radius: 8px; text-align: center; margin: 0.5rem 0; }
-.health-bad { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 0.8rem; border-radius: 8px; text-align: center; margin: 0.5rem 0; }
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 40px rgba(102,126,234,0.35);
+}
 
-.chat-message { padding: 0.9rem; border-radius: 10px; margin: 0.5rem 0; background-color: #fbfdff; color: #0f172a; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); }
-.chat-message-user { background-color: #e8f2ff; border-left: 4px solid #2196f3; color: #0b63c6; }
-.chat-message-assistant { background-color: #f8f0ff; border-left: 4px solid #9c27b0; color: #5b2b7a; }
+/* Health Status Cards */
+.health-good { 
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    color: white;
+    padding: 1.2rem;
+    border-radius: 14px;
+    text-align: center;
+    margin: 0.75rem 0;
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    font-weight: 600;
+}
 
-.stTab > div > div > div > div { padding: 0.85rem 0; }
-.info-box { background-color: #eef6ff; border-left: 4px solid #2196f3; padding: 0.9rem; margin: 1rem 0; border-radius: 6px; }
+.health-bad { 
+    background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+    color: white;
+    padding: 1.2rem;
+    border-radius: 14px;
+    text-align: center;
+    margin: 0.75rem 0;
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+    border: 1px solid rgba(255,255,255,0.2);
+    font-weight: 600;
+}
 
-.stButton>button { background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%); color: #fff; border-radius: 8px; padding: 0.55rem 0.9rem; border: none; font-weight: 600; }
-.stButton>button:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(124,58,237,0.18); }
+/* Chat Messages */
+.chat-message { 
+    padding: 1.2rem;
+    border-radius: 14px;
+    margin: 0.75rem 0;
+    background-color: #ffffff;
+    color: #1e293b;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
 
-/* Make dataframes and charts look cleaner */
-.stDataFrame, .stAgGrid { border-radius: 8px; overflow: hidden; }
+.chat-message-user { 
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    border-left: 5px solid #3b82f6;
+    color: #1e40af;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.15);
+}
 
-/* Responsive tweaks */
+.chat-message-assistant { 
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+    border-left: 5px solid #a855f7;
+    color: #6b21a8;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.15);
+}
+
+/* Info Box */
+.info-box { 
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border-left: 5px solid #3b82f6;
+    padding: 1.2rem;
+    margin: 1.5rem 0;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+}
+
+/* Enhanced Buttons */
+.stButton>button { 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0.3px;
+}
+
+.stButton>button:hover { 
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.stButton>button:active {
+    transform: translateY(0);
+}
+
+/* Tabs Enhancement */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background-color: #f8fafc;
+    padding: 0.5rem;
+    border-radius: 12px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 50px;
+    background-color: transparent;
+    border-radius: 10px;
+    color: #64748b;
+    font-weight: 600;
+    padding: 0 1.5rem;
+}
+
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* Metrics Enhancement */
+[data-testid="stMetricValue"] {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* DataFrame Enhancement */
+.stDataFrame, .stAgGrid { 
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e2e8f0;
+}
+
+/* Sidebar Enhancement */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+[data-testid="stSidebar"] > div:first-child {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* Input Fields */
+input, textarea, select {
+    border-radius: 10px !important;
+    border: 2px solid #e2e8f0 !important;
+    padding: 0.75rem !important;
+    font-size: 1rem !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+    outline: none !important;
+}
+
+/* Slider Enhancement */
+.stSlider > div > div > div > div {
+    background-color: #667eea !important;
+}
+
+/* Expander Enhancement */
+.streamlit-expanderHeader {
+    background-color: #f8fafc;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+}
+
+.streamlit-expanderHeader:hover {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+/* File Uploader */
+[data-testid="stFileUploader"] {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 2px dashed #cbd5e1;
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: #667eea;
+    background-color: #f8fafc;
+}
+
+/* Pills (Suggestions) */
+[data-testid="stHorizontalBlock"] button {
+    background-color: #f1f5f9;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    color: #475569;
+}
+
+[data-testid="stHorizontalBlock"] button:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+    transform: translateY(-2px);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* Loading Spinner */
+.stSpinner > div {
+    border-top-color: #667eea !important;
+}
+
+/* Success/Error/Warning Messages */
+.stSuccess, .stError, .stWarning, .stInfo {
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    border-left-width: 5px;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-    .main-header { padding: 1.2rem; }
+    .main-header {
+        padding: 2rem 1.5rem;
+    }
+    
+    .main-header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .main-header h3 {
+        font-size: 1.1rem;
+    }
+}
+
+/* Plotly Chart Enhancement */
+.js-plotly-plot {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.08);
+}
+
+/* Form Elements */
+.stForm {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
+}
+
+/* Popover Enhancement */
+[data-testid="stPopover"] {
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15);
+}
+
+/* Chat Input Enhancement */
+[data-testid="stChatInput"] {
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
+}
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: #667eea;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+}
+
+/* Select Box Enhancement */
+.stSelectbox > div > div {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+}
+
+.stSelectbox > div > div:hover {
+    border-color: #cbd5e1;
+}
+
+/* Number Input Enhancement */
+.stNumberInput > div > div > input {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
+}
+
+/* Text Area Enhancement */
+.stTextArea > div > div > textarea {
+    border-radius: 10px;
+    border: 2px solid #e2e8f0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -102,7 +467,7 @@ html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
 # Main Header
 st.markdown("""
 <div class="main-header">
-    <h1>Battery Pack SOH Prediction Platform</h1>
+    <h1>⚡ Battery Pack SOH Prediction Platform</h1>
     <h3>AI-Powered Battery Health Assessment</h3>
     <p>State-of-the-art analytics, predictions, and an expert assistant — all in one app.</p>
 </div>
@@ -112,10 +477,10 @@ st.markdown("""
 # Sidebar Configuration (styled)
 # -------------------------------
 with st.sidebar:
-    st.markdown("<div class='sidebar-section'><h3>Configuration Panel</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-section'><h3 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:700;'>⚙️ Configuration Panel</h3></div>", unsafe_allow_html=True)
 
     # File Upload (styled card)
-    st.markdown("<div class='uploader-card'><h4 style='margin:0 0 0.35rem 0;'>Upload PulseBat Dataset</h4>", unsafe_allow_html=True)
+    st.markdown("<div class='uploader-card'><h4 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:600;'>📁 Upload PulseBat Dataset</h4>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
         "", 
         type=["csv"],
@@ -124,7 +489,7 @@ with st.sidebar:
     st.markdown("</div>", unsafe_allow_html=True)
 
     # Model Settings (grouped)
-    st.markdown("<div class='sidebar-section'><h4 style='margin:0 0 0.35rem 0;'>Model Configuration</h4>", unsafe_allow_html=True)
+    st.markdown("<div class='sidebar-section'><h4 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:600;'>🔧 Model Configuration</h4>", unsafe_allow_html=True)
 
     # Preprocessing Options
     sort_method = st.selectbox(
@@ -644,31 +1009,34 @@ if uploaded_file is not None:
     
     # Update sidebar stats
     with st.sidebar:
-        st.markdown("### Dataset Statistics")
-        st.metric("Total Samples", len(df))
-        st.metric("Battery Cells", len(u_cols))
-        st.metric("Avg Pack SOH", f"{df['Pack_SOH'].mean():.3f}")
-        st.metric("SOH Range", f"{df['Pack_SOH'].min():.3f} - {df['Pack_SOH'].max():.3f}")
+        st.markdown("<div class='sidebar-section'>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin:0 0 1rem 0; color:#1e293b; font-weight:600;'>📊 Dataset Statistics</h4>", unsafe_allow_html=True)
         
-        # Health classification stats
-        healthy_count = (df["Pack_SOH"] >= threshold).sum()
-        unhealthy_count = len(df) - healthy_count
-        st.metric("Healthy Batteries", healthy_count)
-        st.metric("Problematic Batteries", unhealthy_count)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("📦 Total Samples", f"{len(df):,}")
+            st.metric("🔋 Battery Cells", len(u_cols))
+            st.metric("✅ Healthy", f"{(df['Pack_SOH'] >= threshold).sum():,}")
+        with col2:
+            st.metric("📈 Avg SOH", f"{df['Pack_SOH'].mean():.3f}")
+            st.metric("📊 SOH Range", f"{df['Pack_SOH'].min():.2f}-{df['Pack_SOH'].max():.2f}")
+            st.metric("⚠️ Problems", f"{(len(df) - (df['Pack_SOH'] >= threshold).sum()):,}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     
     # Create tabs for different sections
     tab1, tab2, tab3, tab4 = st.tabs(["Data Analysis", "Linear Regression", "Visualizations", "AI Assistant"])
     
     with tab1:
-        st.markdown("## Comprehensive Data Analysis")
+        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>📊 Comprehensive Data Analysis</h2>", unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, gap="large")
         
         with col1:
-            st.markdown("### Dataset Overview")
-            st.dataframe(df.head(10), use_container_width=True)
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📋 Dataset Overview</h3>", unsafe_allow_html=True)
+            st.dataframe(df.head(10), use_container_width=True, height=400)
             
-            st.markdown("### Data Quality Report")
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔍 Data Quality Report</h3>", unsafe_allow_html=True)
             quality_metrics = {
                 "Missing Values": df[u_cols].isnull().sum().sum(),
                 "Complete Records": len(df) - df[u_cols].isnull().any(axis=1).sum(),
@@ -680,10 +1048,18 @@ if uploaded_file is not None:
                 st.metric(metric, f"{value:.3f}" if isinstance(value, float) else value)
         
         with col2:
-            st.markdown("### SOH Distribution Analysis")
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📈 SOH Distribution Analysis</h3>", unsafe_allow_html=True)
             fig_hist = px.histogram(df, x="Pack_SOH", nbins=30, 
                                   title="Battery Pack SOH Distribution",
-                                  template="plotly_white")
+                                  template="plotly_white",
+                                  color_discrete_sequence=['#667eea'])
+            fig_hist.update_layout(
+                title_font_size=16,
+                title_font_color='#1e293b',
+                title_font_family='Inter',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)'
+            )
             st.plotly_chart(fig_hist, use_container_width=True)
             
             # Health classification stats
@@ -694,54 +1070,72 @@ if uploaded_file is not None:
                 values=[healthy_count, unhealthy_count],
                 names=['Healthy', 'Problematic'],
                 title=f"Battery Health Classification (Threshold: {threshold})",
-                color_discrete_sequence=['#4CAF50', '#f44336']
+                color_discrete_sequence=['#10b981', '#ef4444']
+            )
+            fig_pie.update_layout(
+                title_font_size=16,
+                title_font_color='#1e293b',
+                title_font_family='Inter'
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         
         # Cell correlation analysis
-        st.markdown("### Cell Correlation Matrix")
+        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔗 Cell Correlation Matrix</h3>", unsafe_allow_html=True)
         corr_matrix = df[u_cols].corr()
         
         fig_heatmap = px.imshow(
             corr_matrix,
             title="Battery Cell Correlation Heatmap",
             template="plotly_white",
-            aspect="auto"
+            aspect="auto",
+            color_continuous_scale='RdBu_r'
+        )
+        fig_heatmap.update_layout(
+            title_font_size=16,
+            title_font_color='#1e293b',
+            title_font_family='Inter'
         )
         st.plotly_chart(fig_heatmap, use_container_width=True)
     
     with tab2:
-        st.markdown("## Linear Regression Model Training")
+        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>🤖 Linear Regression Model Training</h2>", unsafe_allow_html=True)
         
-        with st.spinner("Training Linear Regression model..."):
+        with st.spinner("🔄 Training Linear Regression model..."):
             model_results = train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random_state)
         
-        st.success("Linear Regression model trained successfully!")
+        st.success("✅ Linear Regression model trained successfully!")
         
         # Performance metrics
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns(3, gap="large")
         
         with col1:
-            st.markdown("### Training Performance")
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📚 Training Performance</h3>", unsafe_allow_html=True)
             train_metrics = model_results["train_metrics"]
             for metric, value in train_metrics.items():
-                st.metric(f"Train {metric}", f"{value:.4f}")
+                delta = None
+                if metric == "R²":
+                    delta = f"{(value - 0.5) * 100:.1f}% vs baseline"
+                st.metric(f"🎯 Train {metric}", f"{value:.4f}", delta=delta)
         
         with col2:
-            st.markdown("### Test Performance")
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>🎯 Test Performance</h3>", unsafe_allow_html=True)
             test_metrics = model_results["test_metrics"]
             for metric, value in test_metrics.items():
-                st.metric(f"Test {metric}", f"{value:.4f}")
+                delta = None
+                if metric == "R²":
+                    delta = f"{(value - 0.5) * 100:.1f}% vs baseline"
+                st.metric(f"📊 Test {metric}", f"{value:.4f}", delta=delta)
         
         with col3:
-            st.markdown("### Cross-Validation")
+            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>✔️ Cross-Validation</h3>", unsafe_allow_html=True)
             cv_mean = model_results["cv_scores"].mean()
             cv_std = model_results["cv_scores"].std()
-            st.metric("CV R² Mean", f"{cv_mean:.4f}")
-            st.metric("CV R² Std", f"{cv_std:.4f}")
+            st.metric("📈 CV R² Mean", f"{cv_mean:.4f}")
+            st.metric("📉 CV R² Std", f"{cv_std:.4f}")
+            st.metric("🔢 Folds", cv_folds)
         
         # Model interpretation
-        st.markdown("### Model Interpretation")
+        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔬 Model Interpretation</h3>", unsafe_allow_html=True)
         
         # Feature importance (coefficients)
         feature_importance = pd.DataFrame({
@@ -754,12 +1148,22 @@ if uploaded_file is not None:
             x='Coefficient', y='Feature',
             title="Top 15 Feature Coefficients (Linear Regression)",
             template="plotly_white",
-            orientation='h'
+            orientation='h',
+            color='Coefficient',
+            color_continuous_scale='RdBu'
+        )
+        fig_importance.update_layout(
+            title_font_size=16,
+            title_font_color='#1e293b',
+            title_font_family='Inter',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            showlegend=False
         )
         st.plotly_chart(fig_importance, use_container_width=True)
         
         # Model summary
-        st.markdown("### Model Summary")
+        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>📝 Model Summary</h3>", unsafe_allow_html=True)
         st.markdown(f"""
         **Model Type:** Linear Regression  
         **Features:** {len(model_results["feature_names"])} cell voltages (U1-U21)  
@@ -771,21 +1175,34 @@ if uploaded_file is not None:
         """)
     
     with tab3:
-        st.markdown("## Model Performance Visualizations")
+        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>📊 Model Performance Visualizations</h2>", unsafe_allow_html=True)
         
         # Create visualizations
         fig1, fig2, fig3 = create_visualizations(model_results, df)
         
+        # Enhanced figure layouts
+        for fig in [fig1, fig2, fig3]:
+            fig.update_layout(
+                title_font_size=18,
+                title_font_color='#1e293b',
+                title_font_family='Inter',
+                title_font_weight=600,
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_family='Inter',
+                font_color='#475569'
+            )
+        
         st.plotly_chart(fig1, use_container_width=True)
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, gap="large")
         with col1:
             st.plotly_chart(fig2, use_container_width=True)
         with col2:
             st.plotly_chart(fig3, use_container_width=True)
         
         # Additional analysis
-        st.markdown("### Additional Analysis")
+        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>📈 Additional Analysis</h3>", unsafe_allow_html=True)
         
         # Residuals distribution
         residuals = model_results["y_test"] - model_results["y_test_pred"]
@@ -793,13 +1210,19 @@ if uploaded_file is not None:
             x=residuals,
             title="Distribution of Residuals",
             nbins=30,
-            template="plotly_white"
+            template="plotly_white",
+            color_discrete_sequence=['#764ba2']
+        )
+        fig_residuals.update_layout(
+            title_font_size=16,
+            title_font_color='#1e293b',
+            title_font_family='Inter'
         )
         st.plotly_chart(fig_residuals, use_container_width=True)
     
     with tab4:
         # Battery AI Assistant - Modern Chat Interface
-        st.markdown("## Battery AI Assistant")
+        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>🤖 Battery AI Assistant</h2>", unsafe_allow_html=True)
         
         # Battery-specific suggestions
         BATTERY_SUGGESTIONS = {
@@ -837,7 +1260,7 @@ if uploaded_file is not None:
             st.session_state.battery_messages = []
 
             # RAG Status
-            st.info("RAG System Active: This chatbot uses Retrieval-Augmented Generation with a specialized battery knowledge base for enhanced responses.")
+            st.info("🧠 **RAG System Active**: This chatbot uses Retrieval-Augmented Generation with a specialized battery knowledge base for enhanced responses.")
 
             with st.container():
                 st.chat_input("Ask about batteries, SOH prediction, or maintenance...", key="initial_battery_question")
@@ -961,74 +1384,113 @@ The model uses U1-U21 cell voltage data to predict overall battery pack health. 
                 st.session_state.battery_messages.append({"role": "assistant", "content": response})
 
 else:
-    st.markdown("""
-    ## Welcome to Battery Pack SOH Prediction Platform
+    # Welcome Screen with Enhanced Design
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
+        <div style='text-align: center; padding: 2rem 0;'>
+            <h1 style='color:#1e293b; font-weight:800; font-size:2.5rem; margin-bottom:1rem;'>Welcome to Battery SOH Platform</h1>
+            <p style='color:#64748b; font-size:1.2rem; margin-bottom:2rem;'>Advanced AI-powered battery health prediction and analysis</p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    ### Overview
+    # Feature Cards
+    st.markdown("<h2 style='color:#1e293b; font-weight:700; text-align:center; margin:2rem 0;'>🚀 Key Features</h2>", unsafe_allow_html=True)
     
-    This platform delivers a comprehensive battery State of Health (SOH) prediction system using Linear Regression
-    plus an AI-powered assistant for expert analysis.
-    
-    ### Key Features
-    
-    **Battery SOH Prediction**: Upload your PulseBat dataset to predict State of Health using U1-U21 cell data
-    
-    **Linear Regression Model**: Advanced machine learning model with comprehensive evaluation metrics
-    
-    **Data Preprocessing**: Multiple sorting techniques (None, Ascending, Descending) for cell data analysis
-    
-    **Health Classification**: Configurable threshold-based classification (default: 0.6)
-    
-    **Rich Visualizations**: Interactive charts showing predicted vs actual SOH, residuals, and distributions
-    
-    **AI Assistant**: Expert assistant for battery insights and maintenance tips
-    
-    ### Getting Started:
-    1. Upload your PulseBat CSV file using the sidebar
-    2. Configure your model settings (sorting method, threshold, etc.)
-    3. Explore the data analysis, model training, and visualizations
-    4. Chat with our AI assistant for insights and battery tips
-    
-    ---
-    
-    Use the uploader in the sidebar to load your data.
-    """)
-    
-    # Feature showcase
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3, gap="large")
     
     with col1:
         st.markdown("""
-        ### Linear Regression
-        - U1-U21 cell feature extraction
-        - Multiple sorting techniques
-        - Cross-validation
-        - Comprehensive metrics
-        """)
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(102,126,234,0.25); min-height: 300px;'>
+            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>🤖 Linear Regression</h3>
+            <ul style='line-height: 1.8;'>
+                <li>U1-U21 cell feature extraction</li>
+                <li>Multiple sorting techniques</li>
+                <li>Cross-validation analysis</li>
+                <li>Comprehensive metrics</li>
+                <li>Feature importance</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
-        ### Rich Analytics
-        - Interactive visualizations
-        - Correlation analysis
-        - Distribution plots
-        - Quality reports
-        """)
+        <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(240,147,251,0.25); min-height: 300px;'>
+            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>📊 Rich Analytics</h3>
+            <ul style='line-height: 1.8;'>
+                <li>Interactive visualizations</li>
+                <li>Correlation analysis</li>
+                <li>Distribution plots</li>
+                <li>Quality reports</li>
+                <li>Real-time insights</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
         st.markdown("""
-        ### AI Assistant
-        - Battery expertise
-        - Model insights
-        - Maintenance tips
-        - Real-time analysis
-        """)
+        <div style='background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(79,172,254,0.25); min-height: 300px;'>
+            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>🧠 AI Assistant</h3>
+            <ul style='line-height: 1.8;'>
+                <li>Battery expertise</li>
+                <li>Model insights</li>
+                <li>Maintenance tips</li>
+                <li>Real-time analysis</li>
+                <li>RAG-enhanced responses</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Getting Started Section
+    st.markdown("<h2 style='color:#1e293b; font-weight:700; text-align:center; margin:3rem 0 2rem 0;'>🎯 Getting Started</h2>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1], gap="large")
+    
+    with col1:
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 2rem; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 8px 32px rgba(15,23,42,0.08);'>
+            <h3 style='color:#1e293b; font-weight:600; margin-bottom:1.5rem;'>📝 Steps to Follow</h3>
+            <ol style='line-height: 2; color:#475569; font-size:1.05rem;'>
+                <li><strong>Upload Dataset:</strong> Use the sidebar to upload your PulseBat CSV file</li>
+                <li><strong>Configure Settings:</strong> Adjust model parameters and thresholds</li>
+                <li><strong>Explore Analysis:</strong> View comprehensive data insights</li>
+                <li><strong>Train Model:</strong> Run Linear Regression prediction</li>
+                <li><strong>Chat with AI:</strong> Get expert battery guidance</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 2rem; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 8px 32px rgba(15,23,42,0.08);'>
+            <h3 style='color:#1e293b; font-weight:600; margin-bottom:1.5rem;'>💡 What You'll Get</h3>
+            <ul style='line-height: 2; color:#475569; font-size:1.05rem;'>
+                <li><strong>Accurate Predictions:</strong> ML-powered SOH forecasting</li>
+                <li><strong>Visual Insights:</strong> Beautiful interactive charts</li>
+                <li><strong>Health Classification:</strong> Instant battery status</li>
+                <li><strong>Expert Guidance:</strong> AI-powered recommendations</li>
+                <li><strong>Export Ready:</strong> Downloadable reports</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Call to Action
+    st.markdown("<div style='height:2rem;'></div>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        st.markdown("""
+        <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; box-shadow: 0 10px 30px rgba(102,126,234,0.3);'>
+            <h3 style='color: white; margin: 0 0 0.5rem 0; font-weight:700;'>👈 Ready to Begin?</h3>
+            <p style='color: rgba(255,255,255,0.9); margin: 0; font-size:1.1rem;'>Upload your dataset using the sidebar</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Footer
-st.markdown("---")
+st.markdown("<div style='height:3rem;'></div>", unsafe_allow_html=True)
 st.markdown("""
-<div style="text-align: center; color: #666; padding: 2rem;">
-    <p><strong>Battery Pack SOH Prediction Platform</strong></p>
-    <p>Linear Regression, rich analytics, and an AI assistant.</p>
+<div style="text-align: center; padding: 3rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-top: 3rem; box-shadow: 0 10px 40px rgba(102,126,234,0.2);">
+    <h3 style="color: white; margin: 0 0 0.5rem 0; font-weight: 700; font-size: 1.5rem;">⚡ Battery Pack SOH Prediction Platform</h3>
+    <p style="color: rgba(255,255,255,0.95); margin: 0; font-size: 1.1rem;">Powered by Linear Regression, AI, and Advanced Analytics</p>
+    <p style="color: rgba(255,255,255,0.85); margin: 1rem 0 0 0; font-size: 0.95rem;">SOFE3370 Final Project - Group 18 | Built with ❤️ using Streamlit</p>
 </div>
 """, unsafe_allow_html=True)
