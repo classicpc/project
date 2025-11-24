@@ -1,4 +1,4 @@
-# 🔋 Battery Pack SOH Prediction & AI Assistant Platform
+# Battery Pack SOH Prediction & AI Assistant Platform
 # SOFE3370 Final Project - Group 18
 # Pranav Ashok Chaudhari, Tarun Modekurty, Leela Alagala, Hannah Albi
 
@@ -32,128 +32,122 @@ OPENAI_API_KEY = "sk-proj--3Uy7TXOHsdHsXDC_GLb9IihxfeP8RXFVt5mo221DSGK3cF5oRYvMs
 # Page Configuration
 # -------------------------------
 st.set_page_config(
-    page_title="🔋 Battery Pack SOH Prediction Platform",
-    page_icon="🔋",
+    page_title="Battery Pack SOH Prediction Platform",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional UI
+# Custom CSS for professional UI (enhanced)
 st.markdown("""
 <style>
-    .main-header {
-        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        padding: 2rem;
-        border-radius: 15px;
-        text-align: center;
-        margin-bottom: 2rem;
-        color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-    .health-good {
-        background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    .health-bad {
-        background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        margin: 1rem 0;
-    }
-    .chat-message {
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #667eea;
-        background-color: #f8f9fa;
-        color: #333333;
-    }
-    .chat-message-user {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
-        color: #1565c0;
-    }
-    .chat-message-assistant {
-        background-color: #f3e5f5;
-        border-left: 4px solid #9c27b0;
-        color: #4a148c;
-    }
-    .stTab > div > div > div > div {
-        padding: 1rem 0;
-    }
-    .info-box {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
-        padding: 1rem;
-        margin: 1rem 0;
-        border-radius: 5px;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
+
+.main-header {
+    background: linear-gradient(90deg, #0f172a 0%, #0f3460 60%, #1e3c72 100%);
+    padding: 2rem 1.5rem;
+    border-radius: 14px;
+    text-align: center;
+    margin-bottom: 1.75rem;
+    color: #ffffff;
+    box-shadow: 0 8px 30px rgba(5, 15, 40, 0.15);
+}
+.main-header h1 { margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+.main-header h3 { margin: 0.25rem 0 0.5rem 0; font-weight: 500; color: rgba(255,255,255,0.9); }
+.main-header p { margin: 0; color: rgba(255,255,255,0.85); }
+
+.uploader-card {
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    padding: 0.85rem;
+    border-radius: 10px;
+    color: #0f172a;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    margin-bottom: 1rem;
+}
+.sidebar-section { background: #ffffff; padding: 0.75rem; border-radius: 10px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04); margin-bottom: 1rem; }
+
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    margin: 0.5rem 0;
+    box-shadow: 0 4px 12px rgba(102,126,234,0.12);
+}
+
+.health-good { background: linear-gradient(135deg, #16a34a 0%, #52b788 100%); color: white; padding: 0.8rem; border-radius: 8px; text-align: center; margin: 0.5rem 0; }
+.health-bad { background: linear-gradient(135deg, #ef4444 0%, #f97316 100%); color: white; padding: 0.8rem; border-radius: 8px; text-align: center; margin: 0.5rem 0; }
+
+.chat-message { padding: 0.9rem; border-radius: 10px; margin: 0.5rem 0; background-color: #fbfdff; color: #0f172a; box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04); }
+.chat-message-user { background-color: #e8f2ff; border-left: 4px solid #2196f3; color: #0b63c6; }
+.chat-message-assistant { background-color: #f8f0ff; border-left: 4px solid #9c27b0; color: #5b2b7a; }
+
+.stTab > div > div > div > div { padding: 0.85rem 0; }
+.info-box { background-color: #eef6ff; border-left: 4px solid #2196f3; padding: 0.9rem; margin: 1rem 0; border-radius: 6px; }
+
+.stButton>button { background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%); color: #fff; border-radius: 8px; padding: 0.55rem 0.9rem; border: none; font-weight: 600; }
+.stButton>button:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(124,58,237,0.18); }
+
+/* Make dataframes and charts look cleaner */
+.stDataFrame, .stAgGrid { border-radius: 8px; overflow: hidden; }
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .main-header { padding: 1.2rem; }
+}
 </style>
 """, unsafe_allow_html=True)
 
 # Main Header
 st.markdown("""
 <div class="main-header">
-    <h1>🔋 Battery Pack SOH Prediction Platform</h1>
+    <h1>Battery Pack SOH Prediction Platform</h1>
     <h3>AI-Powered Battery Health Assessment</h3>
     <p>State-of-the-art analytics, predictions, and an expert assistant — all in one app.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Sidebar Configuration
+# Sidebar Configuration (styled)
 # -------------------------------
 with st.sidebar:
-    st.markdown("## 🎛️ Configuration Panel")
-    
-    # File Upload
+    st.markdown("<div class='sidebar-section'><h3>Configuration Panel</h3></div>", unsafe_allow_html=True)
+
+    # File Upload (styled card)
+    st.markdown("<div class='uploader-card'><h4 style='margin:0 0 0.35rem 0;'>Upload PulseBat Dataset</h4>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
-        "📁 Upload PulseBat Dataset", 
+        "", 
         type=["csv"],
         help="Upload your PulseBat dataset CSV file"
     )
-    
-    st.markdown("---")
-    
-    # Model Settings
-    st.markdown("### 🤖 Model Configuration")
-    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Model Settings (grouped)
+    st.markdown("<div class='sidebar-section'><h4 style='margin:0 0 0.35rem 0;'>Model Configuration</h4>", unsafe_allow_html=True)
+
     # Preprocessing Options
     sort_method = st.selectbox(
-        "📊 Cell Sorting Method:",
+        "Cell Sorting Method:",
         ["None", "Ascending", "Descending"],
         help="Sort U1–U21 cell values for pattern analysis"
     )
-    
+
     # SOH Threshold
     threshold = st.slider(
-        "⚡ SOH Health Threshold:",
+        "SOH Health Threshold:",
         min_value=0.0, max_value=1.0, value=0.6, step=0.01,
         help="Threshold below which battery is considered unhealthy"
     )
-    
+
     # Advanced Settings
-    with st.expander("🔧 Advanced Settings"):
+    with st.expander("Advanced Settings"):
         test_size = st.slider("Train/Test Split", 0.1, 0.5, 0.2)
         cv_folds = st.number_input("Cross-Validation Folds", 3, 10, 5)
         random_state = st.number_input("Random State", 1, 100, 42)
-    
-    st.markdown("---")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 
 # -------------------------------
@@ -210,7 +204,7 @@ def retrieve_relevant_context(user_query):
 @st.cache_data
 def load_and_preprocess_data(file):
     """Load and preprocess the PulseBat dataset"""
-    with st.spinner("🔄 Loading and preprocessing data..."):
+    with st.spinner("Loading and preprocessing data..."):
         df = pd.read_csv(file)
         
         # Identify U1-U21 cell columns
@@ -219,7 +213,7 @@ def load_and_preprocess_data(file):
         
         # Check if we have the expected U1-U21 columns
         if len(u_cols) != 21:
-            st.warning(f"⚠️ Expected 21 cell columns (U1-U21), found {len(u_cols)}: {u_cols}")
+            st.warning(f"Expected 21 cell columns (U1-U21), found {len(u_cols)}: {u_cols}")
         
         # Create pack SOH by aggregating individual cell SOH values
         # Using mean as the primary aggregation method
@@ -364,9 +358,9 @@ def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random
 def classify_battery_health(soh_value, threshold=0.6):
     """Classify battery health based on SOH threshold"""
     if soh_value < threshold:
-        return "⚠️ The battery has a problem.", "bad"
+        return "The battery has a problem.", "bad"
     else:
-        return "✅ The battery is healthy.", "good"
+        return "The battery is healthy.", "good"
 
 # -------------------------------
 # ChatGPT Integration
@@ -381,17 +375,17 @@ def ask_chatgpt_rag(prompt, context_data=None, api_key=None):
     if api_key is None:
         api_key = OPENAI_API_KEY
 
-    if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
-        # Fallback response using RAG knowledge base
-        if retrieved_context:
-            return f"""## 🧠 RAG Knowledge Base Response
+        if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
+            # Fallback response using RAG knowledge base
+            if retrieved_context:
+                return f"""## RAG Knowledge Base Response
 
 {retrieved_context}
 
 ---
 *Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
-        else:
-            return """## ❌ OpenAI API key not configured
+            else:
+                return """## OpenAI API key not configured
 
 Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
@@ -437,7 +431,7 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"❌ AI Assistant Error: {str(e)}"
+        return f"AI Assistant Error: {str(e)}"
 
 def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
     """Streaming RAG-enhanced ChatGPT integration"""
@@ -451,14 +445,14 @@ def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
     if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
         # Fallback response using RAG knowledge base
         if retrieved_context:
-            response = f"""## 🧠 RAG Knowledge Base Response
+            response = f"""## RAG Knowledge Base Response
 
 {retrieved_context}
 
 ---
 *Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
         else:
-            response = """## ❌ OpenAI API key not configured
+            response = """## OpenAI API key not configured
 
 Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
@@ -517,7 +511,7 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
                 yield chunk.choices[0].delta.content
                 
     except Exception as e:
-        yield f"❌ AI Assistant Error: {str(e)}"
+        yield f"AI Assistant Error: {str(e)}"
 
 def show_feedback_controls(message_index):
     """Shows the feedback control for assistant messages"""
@@ -528,18 +522,18 @@ def show_feedback_controls(message_index):
             with st.container(gap=None):
                 st.markdown(":small[Rating]")
                 rating = st.feedback(options="stars")
-            
+
             details = st.text_area("More information (optional)")
-            
+
             if st.checkbox("Include chat history with my feedback", True):
                 relevant_history = st.session_state.battery_messages[:message_index]
             else:
                 relevant_history = []
-            
+
             ""  # Add some space
-            
+
             if st.form_submit_button("Send feedback"):
-                st.success("Thank you for your feedback! 🎉")
+                st.success("Thank you for your feedback!")
                 # TODO: Submit feedback here!
 
 # -------------------------------
@@ -635,29 +629,22 @@ def create_visualizations(model_results, df):
 # Main Application Logic
 # -------------------------------
 
-# Demo mode option
-if uploaded_file is None:
-    st.markdown("### 🎯 Try Demo Mode")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        if st.button("🚀 Load Demo Data", type="primary"):
-            uploaded_file = "demo"
-    with col2:
-        st.info("👆 Click to try the app with sample battery data")
+# Note: Demo mode removed. Users must upload a dataset to proceed.
+# To re-enable demo mode, re-add a button that sets `uploaded_file = "demo"`.
 
 # Main application flow
 if uploaded_file is not None:
     # Load data (demo or uploaded)
     if uploaded_file == "demo":
         df, u_cols = generate_sample_data()
-        st.success("✅ Demo dataset loaded! (1000 synthetic battery samples)")
+        st.success("Demo dataset loaded (1000 synthetic battery samples)")
     else:
         df, u_cols = load_and_preprocess_data(uploaded_file)
-        st.success("✅ PulseBat dataset loaded successfully!")
+        st.success("PulseBat dataset loaded successfully!")
     
     # Update sidebar stats
     with st.sidebar:
-        st.markdown("### 📊 Dataset Statistics")
+        st.markdown("### Dataset Statistics")
         st.metric("Total Samples", len(df))
         st.metric("Battery Cells", len(u_cols))
         st.metric("Avg Pack SOH", f"{df['Pack_SOH'].mean():.3f}")
@@ -670,10 +657,10 @@ if uploaded_file is not None:
         st.metric("Problematic Batteries", unhealthy_count)
     
     # Create tabs for different sections
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Data Analysis", "🤖 Linear Regression", "📈 Visualizations", "💬 AI Assistant"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Data Analysis", "Linear Regression", "Visualizations", "AI Assistant"])
     
     with tab1:
-        st.markdown("## 📊 Comprehensive Data Analysis")
+        st.markdown("## Comprehensive Data Analysis")
         
         col1, col2 = st.columns(2)
         
@@ -712,7 +699,7 @@ if uploaded_file is not None:
             st.plotly_chart(fig_pie, use_container_width=True)
         
         # Cell correlation analysis
-        st.markdown("### 🔥 Cell Correlation Matrix")
+        st.markdown("### Cell Correlation Matrix")
         corr_matrix = df[u_cols].corr()
         
         fig_heatmap = px.imshow(
@@ -724,37 +711,37 @@ if uploaded_file is not None:
         st.plotly_chart(fig_heatmap, use_container_width=True)
     
     with tab2:
-        st.markdown("## 🤖 Linear Regression Model Training")
+        st.markdown("## Linear Regression Model Training")
         
-        with st.spinner("🔄 Training Linear Regression model..."):
+        with st.spinner("Training Linear Regression model..."):
             model_results = train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random_state)
         
-        st.success("✅ Linear Regression model trained successfully!")
+        st.success("Linear Regression model trained successfully!")
         
         # Performance metrics
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("### 📈 Training Performance")
+            st.markdown("### Training Performance")
             train_metrics = model_results["train_metrics"]
             for metric, value in train_metrics.items():
                 st.metric(f"Train {metric}", f"{value:.4f}")
         
         with col2:
-            st.markdown("### 🎯 Test Performance")
+            st.markdown("### Test Performance")
             test_metrics = model_results["test_metrics"]
             for metric, value in test_metrics.items():
                 st.metric(f"Test {metric}", f"{value:.4f}")
         
         with col3:
-            st.markdown("### 🔄 Cross-Validation")
+            st.markdown("### Cross-Validation")
             cv_mean = model_results["cv_scores"].mean()
             cv_std = model_results["cv_scores"].std()
             st.metric("CV R² Mean", f"{cv_mean:.4f}")
             st.metric("CV R² Std", f"{cv_std:.4f}")
         
         # Model interpretation
-        st.markdown("### 🔍 Model Interpretation")
+        st.markdown("### Model Interpretation")
         
         # Feature importance (coefficients)
         feature_importance = pd.DataFrame({
@@ -772,7 +759,7 @@ if uploaded_file is not None:
         st.plotly_chart(fig_importance, use_container_width=True)
         
         # Model summary
-        st.markdown("### 📋 Model Summary")
+        st.markdown("### Model Summary")
         st.markdown(f"""
         **Model Type:** Linear Regression  
         **Features:** {len(model_results["feature_names"])} cell voltages (U1-U21)  
@@ -784,7 +771,7 @@ if uploaded_file is not None:
         """)
     
     with tab3:
-        st.markdown("## 📈 Model Performance Visualizations")
+        st.markdown("## Model Performance Visualizations")
         
         # Create visualizations
         fig1, fig2, fig3 = create_visualizations(model_results, df)
@@ -798,7 +785,7 @@ if uploaded_file is not None:
             st.plotly_chart(fig3, use_container_width=True)
         
         # Additional analysis
-        st.markdown("### 📊 Additional Analysis")
+        st.markdown("### Additional Analysis")
         
         # Residuals distribution
         residuals = model_results["y_test"] - model_results["y_test_pred"]
@@ -812,16 +799,16 @@ if uploaded_file is not None:
     
     with tab4:
         # Battery AI Assistant - Modern Chat Interface
-        st.markdown("## 🔋 Battery AI Assistant")
+        st.markdown("## Battery AI Assistant")
         
         # Battery-specific suggestions
         BATTERY_SUGGESTIONS = {
-            "🔋 What is SOH prediction?": "What is State of Health (SOH) prediction and how does it work with battery cells?",
-            "🛠️ Battery maintenance tips": "Give me comprehensive battery maintenance and care tips for longevity",
-            "⚗️ Battery chemistry explained": "Explain different battery chemistries like NMC, LiFePO4 and their characteristics",
-            "♻️ Battery recycling importance": "Why is battery recycling important for sustainability?",
-            "🛡️ Battery safety guidelines": "What are the key safety considerations when working with batteries?",
-            "📊 Model performance analysis": "Analyze the current Linear Regression model performance and provide insights"
+            "What is SOH prediction?": "What is State of Health (SOH) prediction and how does it work with battery cells?",
+            "Battery maintenance tips": "Give me comprehensive battery maintenance and care tips for longevity",
+            "Battery chemistry explained": "Explain different battery chemistries like NMC, LiFePO4 and their characteristics",
+            "Battery recycling importance": "Why is battery recycling important for sustainability?",
+            "Battery safety guidelines": "What are the key safety considerations when working with batteries?",
+            "Model performance analysis": "Analyze the current Linear Regression model performance and provide insights"
         }
         
         # Initialize chat history
@@ -848,10 +835,10 @@ if uploaded_file is not None:
         # Show initial interface when no interaction
         if not user_first_interaction and not has_message_history:
             st.session_state.battery_messages = []
-            
+
             # RAG Status
-            st.info("🧠 **RAG System Active**: This chatbot uses Retrieval-Augmented Generation with a specialized battery knowledge base for enhanced responses.")
-            
+            st.info("RAG System Active: This chatbot uses Retrieval-Augmented Generation with a specialized battery knowledge base for enhanced responses.")
+
             with st.container():
                 st.chat_input("Ask about batteries, SOH prediction, or maintenance...", key="initial_battery_question")
                 
@@ -863,15 +850,15 @@ if uploaded_file is not None:
                 )
             
             # Knowledge Base Topics
-            with st.expander("📚 Available Knowledge Base Topics"):
+            with st.expander("Available Knowledge Base Topics"):
                 st.markdown("""
                 **The RAG system can provide expert insights on:**
-                - 🔋 **SOH Prediction**: State of Health analysis and prediction methods
-                - 🛠️ **Battery Maintenance**: Care tips and longevity best practices  
-                - ⚗️ **Battery Chemistry**: NMC, LiFePO4, degradation mechanisms
-                - ♻️ **Recycling & Sustainability**: Environmental impact and recycling processes
-                - 🛡️ **Safety**: Thermal management and protection measures
-                - 📊 **Model Performance**: Accuracy metrics and evaluation methods
+                - **SOH Prediction**: State of Health analysis and prediction methods
+                - **Battery Maintenance**: Care tips and longevity best practices
+                - **Battery Chemistry**: NMC, LiFePO4, degradation mechanisms
+                - **Recycling & Sustainability**: Environmental impact and recycling processes
+                - **Safety**: Thermal management and protection measures
+                - **Model Performance**: Accuracy metrics and evaluation methods
                 """)
             
             st.stop()
@@ -895,7 +882,6 @@ if uploaded_file is not None:
             
             st.button(
                 "Restart",
-                icon="🔄",
                 on_click=clear_battery_conversation,
             )
         
@@ -930,18 +916,18 @@ if uploaded_file is not None:
                         
                         health_status, health_class = classify_battery_health(prediction, threshold)
                         
-                        response = f"""## 🔮 Battery SOH Prediction
+                        response = f"""## Battery SOH Prediction
 
 **Predicted Pack SOH:** **{prediction:.3f}**  
 **Health Status:** {health_status}  
 
-### 📈 Model Details
+### Model Details
 - **Algorithm:** Linear Regression
 - **Test R² Score:** {model_results['test_metrics']['R²']:.3f}
 - **Test RMSE:** {model_results['test_metrics']['RMSE']:.3f}
 - **Health Threshold:** {threshold}
 
-### 📊 Dataset Context
+### Dataset Context
 - **Total Samples:** {len(df)} batteries
 - **SOH Range:** {df['Pack_SOH'].min():.3f} - {df['Pack_SOH'].max():.3f}
 - **Sorting Method:** {sort_method}
@@ -976,7 +962,7 @@ The model uses U1-U21 cell voltage data to predict overall battery pack health. 
 
 else:
     st.markdown("""
-    ## 🚀 Welcome to Battery Pack SOH Prediction Platform
+    ## Welcome to Battery Pack SOH Prediction Platform
     
     ### Overview
     
@@ -985,27 +971,27 @@ else:
     
     ### Key Features
     
-    🔋 **Battery SOH Prediction**: Upload your PulseBat dataset to predict State of Health using U1-U21 cell data
+    **Battery SOH Prediction**: Upload your PulseBat dataset to predict State of Health using U1-U21 cell data
     
-    🤖 **Linear Regression Model**: Advanced machine learning model with comprehensive evaluation metrics
+    **Linear Regression Model**: Advanced machine learning model with comprehensive evaluation metrics
     
-    📊 **Data Preprocessing**: Multiple sorting techniques (None, Ascending, Descending) for cell data analysis
+    **Data Preprocessing**: Multiple sorting techniques (None, Ascending, Descending) for cell data analysis
     
-    ⚡ **Health Classification**: Configurable threshold-based classification (default: 0.6)
+    **Health Classification**: Configurable threshold-based classification (default: 0.6)
     
-    📈 **Rich Visualizations**: Interactive charts showing predicted vs actual SOH, residuals, and distributions
+    **Rich Visualizations**: Interactive charts showing predicted vs actual SOH, residuals, and distributions
     
-    💬 **AI Assistant**: Expert assistant for battery insights and maintenance tips
+    **AI Assistant**: Expert assistant for battery insights and maintenance tips
     
     ### Getting Started:
-    1. 📁 Upload your PulseBat CSV file using the sidebar
-    2. ⚙️ Configure your model settings (sorting method, threshold, etc.)
-    3. 🎯 Explore the data analysis, model training, and visualizations
-    4. 💭 Chat with our AI assistant for insights and battery tips
+    1. Upload your PulseBat CSV file using the sidebar
+    2. Configure your model settings (sorting method, threshold, etc.)
+    3. Explore the data analysis, model training, and visualizations
+    4. Chat with our AI assistant for insights and battery tips
     
     ---
     
-    **🎯 Don't have data? Try our demo mode above!**
+    Use the uploader in the sidebar to load your data.
     """)
     
     # Feature showcase
@@ -1013,7 +999,7 @@ else:
     
     with col1:
         st.markdown("""
-        ### 🔬 Linear Regression
+        ### Linear Regression
         - U1-U21 cell feature extraction
         - Multiple sorting techniques
         - Cross-validation
@@ -1022,7 +1008,7 @@ else:
     
     with col2:
         st.markdown("""
-        ### 📊 Rich Analytics  
+        ### Rich Analytics
         - Interactive visualizations
         - Correlation analysis
         - Distribution plots
@@ -1031,9 +1017,9 @@ else:
     
     with col3:
         st.markdown("""
-        ### 🤖 AI Assistant
+        ### AI Assistant
         - Battery expertise
-        - Model insights  
+        - Model insights
         - Maintenance tips
         - Real-time analysis
         """)
