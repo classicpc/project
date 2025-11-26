@@ -1,7 +1,10 @@
-# Battery Pack SOH Prediction & AI Assistant Platform
+# 🔋 Battery Pack SOH Prediction & AI Assistant Platform
 # SOFE3370 Final Project - Group 18
 # Pranav Ashok Chaudhari, Tarun Modekurty, Leela Alagala, Hannah Albi
 
+import io
+import json
+import textwrap
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -18,687 +21,657 @@ from openai import OpenAI
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
+
+
+def _json_default_serializer(obj):
+    """Convert numpy/pandas objects to JSON-safe primitives."""
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.ndarray,)):
+        return obj.tolist()
+    if isinstance(obj, (pd.Series, pd.Index)):
+        return obj.tolist()
+    return str(obj)
 
 # -------------------------------
 # Internal API Configuration
 # -------------------------------
 # NOTE: The API key is hardcoded for convenience per user request.
 # Do NOT commit real secrets to public repos.
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = "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"
+DEFAULT_CHAT_MODEL = "gpt-4.1"
+CHAT_COMPATIBLE_MODELS = {
+    "gpt-5.1",
+    "gpt-5",
+    "gpt-5-chat-latest",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o1",
+    "o1-mini",
+    "o3",
+    "o3-mini",
+    "o4-mini",
+}
+
+MODEL_CHOICES = [
+    ("🔥 GPT-5.1 Codex (best)", "gpt-5.1-codex"),
+    ("⚡ GPT-5.1", "gpt-5.1"),
+    ("🧠 GPT-5", "gpt-5"),
+    ("🛠️ GPT-5 Codex", "gpt-5-codex"),
+    ("💬 GPT-5 Chat Latest", "gpt-5-chat-latest"),
+    ("🚀 GPT-4.1", "gpt-4.1"),
+    ("🌈 GPT-4o", "gpt-4o"),
+    ("🧪 o1", "o1"),
+    ("🛰️ o3", "o3"),
+    ("⚙️ GPT-5.1 Codex Mini", "gpt-5.1-codex-mini"),
+    ("⚡ GPT-5 Mini", "gpt-5-mini"),
+    ("🔋 GPT-5 Nano", "gpt-5-nano"),
+    ("📦 GPT-4.1 Mini", "gpt-4.1-mini"),
+    ("📱 GPT-4.1 Nano", "gpt-4.1-nano"),
+    ("🎯 GPT-4o Mini", "gpt-4o-mini"),
+    ("🧩 o1 Mini", "o1-mini"),
+    ("🧭 o3 Mini", "o3-mini"),
+    ("💡 o4 Mini", "o4-mini"),
+    ("⚡ Codex Mini Latest", "codex-mini-latest"),
+]
+
+
+def get_effective_api_key(override: str | None = None) -> str:
+    """Resolve the API key, preferring explicit override, then env, then bundled fallback."""
+    if override:
+        return override.strip()
+
+    env_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if env_key:
+        return env_key
+
+    return OPENAI_API_KEY
+
+
+def get_selected_model() -> str:
+    selected = st.session_state.get("model_choice", DEFAULT_CHAT_MODEL)
+    if selected not in CHAT_COMPATIBLE_MODELS:
+        st.session_state["model_fallback_warning"] = selected
+        return DEFAULT_CHAT_MODEL
+
+    st.session_state["model_fallback_warning"] = None
+    return selected
 
 # -------------------------------
 # Page Configuration
 # -------------------------------
 st.set_page_config(
-    page_title="Battery Pack SOH Prediction Platform",
+    page_title="🔋 Battery Pack SOH Prediction Platform",
+    page_icon="🔋",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for exceptional UI
-st.markdown("""
+# Custom CSS for two-tone professional UI
+st.markdown(r"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
-/* Global Styles */
-html, body, [class*="css"] { 
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    color: #0f172a;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-}
-
-/* Hide Streamlit branding */
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
-.stDeployButton { display: none; }
-header { visibility: hidden; }
-
-/* Smooth animations */
-* { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* Main container padding */
-.block-container {
-    padding-top: 2rem !important;
-    padding-bottom: 3rem !important;
-    max-width: 1400px !important;
-}
-
-/* Main Header - Stunning gradient with animation */
-.main-header {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 25%, #d946ef 50%, #ec4899 75%, #f43f5e 100%);
-    background-size: 400% 400%;
-    animation: gradient-wave 20s ease infinite;
-    padding: 4rem 3rem;
-    border-radius: 24px;
-    text-align: center;
-    margin-bottom: 3rem;
-    color: #ffffff;
-    box-shadow: 
-        0 25px 50px -12px rgba(139, 92, 246, 0.25),
-        0 0 0 1px rgba(255,255,255,0.1) inset,
-        0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.main-header::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
-    animation: rotate 30s linear infinite;
-    pointer-events: none;
-}
-
-.main-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
-}
-
-@keyframes gradient-wave {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
-
-@keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-.main-header h1 { 
-    margin: 0; 
-    font-weight: 800; 
-    letter-spacing: -1.5px; 
-    font-size: 3rem;
-    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    position: relative;
-    z-index: 1;
-    background: linear-gradient(to right, #ffffff, #f0f9ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.main-header h3 { 
-    margin: 1rem 0; 
-    font-weight: 500; 
-    color: rgba(255,255,255,0.95); 
-    font-size: 1.5rem;
-    position: relative;
-    z-index: 1;
-    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
-}
-
-.main-header p { 
-    margin: 0.75rem 0 0 0; 
-    color: rgba(255,255,255,0.9);
-    font-size: 1.125rem;
-    position: relative;
-    z-index: 1;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-
-/* Glassmorphism Cards */
-.uploader-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    padding: 2rem;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 
-        0 20px 40px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-    margin-bottom: 2rem;
-    transform: translateY(0);
-}
-
-.uploader-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-        0 25px 50px rgba(15, 23, 42, 0.12),
-        0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-}
-
-.sidebar-section { 
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(30px) saturate(200%);
-    -webkit-backdrop-filter: blur(30px) saturate(200%);
-    padding: 1.75rem;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 
-        0 20px 40px rgba(15, 23, 42, 0.06),
-        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-    margin-bottom: 2rem;
-    transform: translateY(0);
-}
-
-.sidebar-section:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-        0 25px 50px rgba(15, 23, 42, 0.1),
-        0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-}
-
-/* Enhanced Metric Cards */
-.metric-card {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    padding: 2rem;
-    border-radius: 20px;
-    color: white;
-    text-align: center;
-    margin: 1rem 0;
-    box-shadow: 
-        0 20px 40px rgba(99, 102, 241, 0.3),
-        0 0 0 1px rgba(255,255,255,0.2) inset;
-    border: 1px solid rgba(255,255,255,0.2);
-    transform: translateY(0) scale(1);
-    position: relative;
-    overflow: hidden;
-}
-
-.metric-card::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.metric-card:hover::before {
-    opacity: 1;
-}
-
-.metric-card:hover {
-    transform: translateY(-6px) scale(1.02);
-    box-shadow: 
-        0 30px 60px rgba(99, 102, 241, 0.4),
-        0 0 0 1px rgba(255,255,255,0.3) inset;
-}
-
-/* Health Status Cards */
-.health-good { 
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    padding: 1.5rem;
-    border-radius: 16px;
-    text-align: center;
-    margin: 1rem 0;
-    box-shadow: 
-        0 15px 35px rgba(16, 185, 129, 0.35),
-        0 0 0 1px rgba(255,255,255,0.2) inset;
-    border: 1px solid rgba(255,255,255,0.2);
-    font-weight: 600;
-    font-size: 1.125rem;
-    transform: translateY(0);
-}
-
-.health-good:hover {
-    transform: translateY(-3px);
-    box-shadow: 
-        0 20px 45px rgba(16, 185, 129, 0.45),
-        0 0 0 1px rgba(255,255,255,0.3) inset;
-}
-
-.health-bad { 
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-    padding: 1.5rem;
-    border-radius: 16px;
-    text-align: center;
-    margin: 1rem 0;
-    box-shadow: 
-        0 15px 35px rgba(239, 68, 68, 0.35),
-        0 0 0 1px rgba(255,255,255,0.2) inset;
-    border: 1px solid rgba(255,255,255,0.2);
-    font-weight: 600;
-    font-size: 1.125rem;
-    transform: translateY(0);
-}
-
-.health-bad:hover {
-    transform: translateY(-3px);
-    box-shadow: 
-        0 20px 45px rgba(239, 68, 68, 0.45),
-        0 0 0 1px rgba(255,255,255,0.3) inset;
-}
-
-/* Chat Messages */
-.chat-message { 
-    padding: 1.5rem;
-    border-radius: 16px;
-    margin: 1rem 0;
-    background-color: #ffffff;
-    color: #0f172a;
-    box-shadow: 
-        0 8px 24px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(226, 232, 240, 0.5);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    transform: translateY(0);
-}
-
-.chat-message:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-        0 12px 32px rgba(15, 23, 42, 0.12),
-        0 0 0 1px rgba(226, 232, 240, 0.8);
-}
-
-.chat-message-user { 
-    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-    border-left: 5px solid #3b82f6;
-    color: #1e40af;
-    box-shadow: 
-        0 8px 24px rgba(59, 130, 246, 0.2),
-        0 0 0 1px rgba(59, 130, 246, 0.1) inset;
-}
-
-.chat-message-assistant { 
-    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
-    border-left: 5px solid #a855f7;
-    color: #6b21a8;
-    box-shadow: 
-        0 8px 24px rgba(168, 85, 247, 0.2),
-        0 0 0 1px rgba(168, 85, 247, 0.1) inset;
-}
-
-/* Info Box */
-.info-box { 
-    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-    border-left: 5px solid #3b82f6;
-    padding: 1.2rem;
-    margin: 1.5rem 0;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
-}
-
-/* Enhanced Buttons */
-.stButton>button { 
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: #fff;
-    border-radius: 14px;
-    padding: 0.875rem 2rem;
-    border: none;
-    font-weight: 600;
-    font-size: 1.05rem;
-    box-shadow: 
-        0 10px 30px rgba(99, 102, 241, 0.35),
-        0 0 0 1px rgba(255,255,255,0.2) inset;
-    cursor: pointer;
-    text-transform: none;
-    letter-spacing: 0.3px;
-    position: relative;
-    overflow: hidden;
-}
-
-.stButton>button::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.2);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-}
-
-.stButton>button:hover::before {
-    width: 300px;
-    height: 300px;
-}
-
-.stButton>button:hover { 
-    transform: translateY(-3px);
-    box-shadow: 
-        0 20px 40px rgba(99, 102, 241, 0.45),
-        0 0 0 1px rgba(255,255,255,0.3) inset;
-}
-
-.stButton>button:active {
-    transform: translateY(-1px);
-}
-
-/* Tabs Enhancement */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(20px);
-    padding: 0.75rem;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
-}
-
-.stTabs [data-baseweb="tab"] {
-    height: 54px;
-    background-color: transparent;
-    border-radius: 12px;
-    color: #64748b;
-    font-weight: 600;
-    padding: 0 2rem;
-    font-size: 1.05rem;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    background-color: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
-}
-
-.stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    color: white;
-    box-shadow: 
-        0 10px 30px rgba(99, 102, 241, 0.35),
-        0 0 0 1px rgba(255,255,255,0.2) inset;
-}
-
-/* Metrics Enhancement */
-[data-testid="stMetricValue"] {
-    font-size: 2rem;
-    font-weight: 800;
-    color: #0f172a;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-[data-testid="stMetricLabel"] {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-[data-testid="stMetricDelta"] {
-    font-size: 0.875rem;
-    font-weight: 600;
-}
-
-/* DataFrame Enhancement */
-.stDataFrame, .stAgGrid { 
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 
-        0 10px 30px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(226, 232, 240, 0.5);
-    border: 1px solid #e2e8f0;
-}
-
-.stDataFrame:hover, .stAgGrid:hover {
-    box-shadow: 
-        0 20px 40px rgba(15, 23, 42, 0.12),
-        0 0 0 1px rgba(226, 232, 240, 0.8);
-}
-
-/* Sidebar Enhancement */
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
-    border-right: 1px solid rgba(226, 232, 240, 0.8);
-}
-
-[data-testid="stSidebar"] > div:first-child {
-    background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
-    padding: 2rem 1rem;
-}
-
-/* Sidebar Title Styling */
-[data-testid="stSidebar"] h1, 
-[data-testid="stSidebar"] h2, 
-[data-testid="stSidebar"] h3, 
-[data-testid="stSidebar"] h4 {
-    color: #0f172a;
-    font-weight: 700;
-}
-
-/* Input Fields */
-input, textarea, select {
-    border-radius: 10px !important;
-    border: 2px solid #e2e8f0 !important;
-    padding: 0.75rem !important;
-    font-size: 1rem !important;
-}
-
-input:focus, textarea:focus, select:focus {
-    border-color: #667eea !important;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-    outline: none !important;
-}
-
-/* Slider Enhancement */
-.stSlider > div > div > div > div {
-    background-color: #667eea !important;
-}
-
-/* Expander Enhancement */
-.streamlit-expanderHeader {
-    background-color: #f8fafc;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    border: 1px solid #e2e8f0;
-}
-
-.streamlit-expanderHeader:hover {
-    background-color: #f1f5f9;
-    border-color: #cbd5e1;
-}
-
-/* File Uploader */
-[data-testid="stFileUploader"] {
-    background-color: #ffffff;
-    border-radius: 12px;
-    padding: 1.5rem;
-    border: 2px dashed #cbd5e1;
-}
-
-[data-testid="stFileUploader"]:hover {
-    border-color: #667eea;
-    background-color: #f8fafc;
-}
-
-/* Pills (Suggestions) */
-[data-testid="stHorizontalBlock"] button {
-    background-color: #f1f5f9;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
-    padding: 0.5rem 1rem;
-    font-weight: 500;
-    color: #475569;
-}
-
-[data-testid="stHorizontalBlock"] button:hover {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: transparent;
-    transform: translateY(-2px);
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
-/* Loading Spinner */
-.stSpinner > div {
-    border-top-color: #667eea !important;
-}
-
-/* Success/Error/Warning Messages */
-.stSuccess, .stError, .stWarning, .stInfo {
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    border-left-width: 5px;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
+    /* Import Premium Font */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+    
+    /* Global Styles - Two Tone Theme: Deep Navy (#0A1929) + Electric Cyan (#00D4FF) */
+    * {
+        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main Container - Clean White Background */
+    .main {
+        background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFB 100%);
+        padding: 0 !important;
+    }
+    
+    .block-container {
+        padding: 2rem 3rem !important;
+        max-width: 1400px;
+    }
+    
+    /* Premium Header - Two Tone Design */
     .main-header {
-        padding: 2rem 1.5rem;
+        background: linear-gradient(135deg, #0A1929 0%, #1A2F4A 100%);
+        padding: 2.5rem 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 2rem;
+        color: white;
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.15);
+        border: 2px solid rgba(0, 212, 255, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .main-header::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+        border-radius: 50%;
     }
     
     .main-header h1 {
-        font-size: 1.8rem;
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(90deg, #FFFFFF 0%, #00D4FF 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     .main-header h3 {
         font-size: 1.1rem;
+        font-weight: 400;
+        color: #00D4FF;
+        margin-bottom: 0.3rem;
     }
-}
+    
+    .main-header p {
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 300;
+    }
+    
+    /* Sidebar - Deep Navy Theme */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0A1929 0%, #05101C 100%);
+        padding: 2rem 1rem;
+        border-right: 2px solid rgba(0, 212, 255, 0.2);
+    }
+    
+    [data-testid="stSidebar"] * {
+        color: #E3F2FD !important;
+    }
+    
+    [data-testid="stSidebar"] h2 {
+        color: #00D4FF !important;
+        font-weight: 600;
+    }
+    
+    /* Chat Interface - Two Tone Design */
+    
+    /* User Message - Cyan Tone */
+    [data-testid="stChatMessage"][data-testid*="user"] {
+        background: linear-gradient(135deg, #00D4FF 0%, #00A8CC 100%) !important;
+        border-radius: 20px 20px 4px 20px !important;
+        padding: 1.2rem 1.5rem !important;
+        margin: 1rem 0 !important;
+        margin-left: auto !important;
+        max-width: 75% !important;
+        box-shadow: 0 6px 24px rgba(0, 212, 255, 0.3) !important;
+        border: none !important;
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    [data-testid="stChatMessage"][data-testid*="user"] p {
+        color: #0A1929 !important;
+        font-weight: 500 !important;
+        font-size: 0.95rem !important;
+        line-height: 1.6 !important;
+    }
+    
+    /* Assistant Message - Navy Tone */
+    [data-testid="stChatMessage"][data-testid*="assistant"] {
+        background: linear-gradient(135deg, #0A1929 0%, #1A2F4A 100%) !important;
+        border-radius: 20px 20px 20px 4px !important;
+        padding: 1.8rem !important;
+        margin: 1rem 0 !important;
+        max-width: 80% !important;
+        box-shadow: 0 6px 24px rgba(10, 25, 41, 0.35) !important;
+        border: 2px solid rgba(0, 212, 255, 0.3) !important;
+        animation: slideInLeft 0.3s ease-out;
+    }
+    
+    @keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    [data-testid="stChatMessage"][data-testid*="assistant"] * {
+        color: #FFFFFF !important;
+    }
+    
+    [data-testid="stChatMessage"][data-testid*="assistant"] h2 {
+        color: #00D4FF !important;
+        font-weight: 600 !important;
+        margin-top: 0.5rem !important;
+    }
+    
+    [data-testid="stChatMessage"][data-testid*="assistant"] h3 {
+        color: #00D4FF !important;
+        font-weight: 500 !important;
+    }
+    
+    [data-testid="stChatMessage"][data-testid*="assistant"] strong {
+        color: #00D4FF !important;
+    }
+    
+    /* Chat Input - Modern Design */
+    [data-testid="stChatInput"] {
+        background: #FFFFFF;
+        border-radius: 30px;
+        border: 2px solid #E0E0E0;
+        padding: 0.7rem 1rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    [data-testid="stChatInput"]:focus-within {
+        border-color: #00D4FF;
+        box-shadow: 0 6px 30px rgba(0, 212, 255, 0.25);
+        transform: translateY(-2px);
+    }
+    
+    [data-testid="stChatInput"] input {
+        color: #0A1929 !important;
+        font-size: 0.95rem !important;
+    }
+    
+    /* Pills (Suggestions) - Cyan Theme */
+    [data-testid="stHorizontalBlock"] button {
+        background: linear-gradient(135deg, #00D4FF 0%, #00A8CC 100%);
+        color: #0A1929;
+        border: none;
+        border-radius: 30px;
+        padding: 0.7rem 1.6rem;
+        font-weight: 600;
+        font-size: 0.88rem;
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.25);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+    }
+    
+    [data-testid="stHorizontalBlock"] button:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 24px rgba(0, 212, 255, 0.4);
+        background: linear-gradient(135deg, #00E5FF 0%, #00B8D4 100%);
+    }
+    
+    [data-testid="stHorizontalBlock"] button:active {
+        transform: translateY(-1px) scale(0.98);
+    }
+    
+    /* Tabs - Two Tone Design */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        background: transparent;
+        border-bottom: 2px solid #E0E0E0;
+        padding-bottom: 0;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: #FFFFFF;
+        border-radius: 12px 12px 0 0;
+        padding: 0.9rem 2rem;
+        font-weight: 600;
+        color: #666666;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [data-baseweb="tab"]:hover {
+        background: #F5F5F5;
+        color: #00D4FF;
+        border-color: rgba(0, 212, 255, 0.2);
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #0A1929 0%, #1A2F4A 100%);
+        color: #00D4FF !important;
+        border: 2px solid #00D4FF;
+        box-shadow: 0 4px 16px rgba(0, 212, 255, 0.25);
+    }
+    
+    /* Buttons - Cyan Theme */
+    .stButton > button {
+        background: linear-gradient(135deg, #00D4FF 0%, #00A8CC 100%);
+        color: #0A1929;
+        border: none;
+        border-radius: 14px;
+        padding: 0.9rem 2.8rem;
+        font-weight: 700;
+        font-size: 0.95rem;
+        box-shadow: 0 4px 16px rgba(0, 212, 255, 0.3);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 28px rgba(0, 212, 255, 0.45);
+        background: linear-gradient(135deg, #00E5FF 0%, #00B8D4 100%);
+    }
+    
+    .stButton > button:active {
+        transform: translateY(-1px) scale(0.98);
+    }
+    
+    /* Info Boxes - Cyan Accent */
+    .info-box {
+        background: linear-gradient(135deg, #E3F9FF 0%, #B8EEFF 100%);
+        border-left: 4px solid #00D4FF;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+    }
+    
+    /* Metrics - Clean Design */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFB 100%);
+        padding: 1.8rem;
+        border-radius: 14px;
+        box-shadow: 0 3px 14px rgba(0, 0, 0, 0.08);
+        border: 2px solid #F0F0F0;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 212, 255, 0.2);
+        border-color: rgba(0, 212, 255, 0.4);
+        background: linear-gradient(135deg, #FFFFFF 0%, #F0FBFF 100%);
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-weight: 600;
+        color: #666666;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 0.5rem;
+    }
+    
+    [data-testid="stMetricValue"] {
+        font-weight: 700;
+        background: linear-gradient(135deg, #0A1929 0%, #00D4FF 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 2rem;
+    }
+    
+    /* Health Status Cards */
+    .health-good {
+        background: linear-gradient(135deg, #00C853 0%, #00A843 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        text-align: center;
+        margin: 1rem 0;
+        box-shadow: 0 6px 20px rgba(0, 200, 83, 0.3);
+        font-weight: 600;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .health-bad {
+        background: linear-gradient(135deg, #FF3D00 0%, #DD2C00 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        text-align: center;
+        margin: 1rem 0;
+        box-shadow: 0 6px 20px rgba(255, 61, 0, 0.3);
+        font-weight: 600;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, #F5F5F5 0%, #E8E8E8 100%);
+        border-radius: 12px;
+        padding: 1.2rem;
+        font-weight: 600;
+        border: 2px solid #E0E0E0;
+        color: #0A1929;
+        transition: all 0.3s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: linear-gradient(135deg, #E8F8FF 0%, #D4F1FF 100%);
+        border-color: #00D4FF;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+    }
+    
+    /* Success/Error Messages */
+    .stSuccess {
+        background: linear-gradient(135deg, #C8E6C9 0%, #A5D6A7 100%);
+        border-left: 4px solid #00C853;
+        border-radius: 12px;
+        padding: 1rem;
+        color: #1B5E20;
+    }
+    
+    .stError {
+        background: linear-gradient(135deg, #FFCCBC 0%, #FFAB91 100%);
+        border-left: 4px solid #FF3D00;
+        border-radius: 12px;
+        padding: 1rem;
+        color: #BF360C;
+    }
+    
+    .stInfo {
+        background: linear-gradient(135deg, #B3E5FC 0%, #81D4FA 100%);
+        border-left: 4px solid #00D4FF;
+        border-radius: 12px;
+        padding: 1rem;
+        color: #01579B;
+    }
+    
+    /* Scrollbar - Cyan Theme */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #F5F5F5;
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #00D4FF 0%, #00A8CC 100%);
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #00A8CC 0%, #008FA6 100%);
+    }
+    
+    /* Dataframes */
+    [data-testid="stDataFrame"] {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        border: 2px solid #F0F0F0;
+    }
+    
+    /* Spinner - Cyan */
+    .stSpinner > div {
+        border-top-color: #00D4FF !important;
+    }
 
-/* Plotly Chart Enhancement */
-.js-plotly-plot {
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 
-        0 10px 30px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(226, 232, 240, 0.5);
-    background: white;
-    padding: 1rem;
-}
+    /* Section & Stat Cards */
+    .section-card {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        padding: 2rem;
+        border: 1px solid rgba(10, 25, 41, 0.05);
+        box-shadow: 0 25px 60px rgba(10, 25, 41, 0.08);
+        margin-bottom: 1.5rem;
+    }
 
-.js-plotly-plot:hover {
-    box-shadow: 
-        0 20px 40px rgba(15, 23, 42, 0.12),
-        0 0 0 1px rgba(226, 232, 240, 0.8);
-    transform: translateY(-2px);
-}
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
 
-/* Form Elements */
-.stForm {
-    background-color: #ffffff;
-    padding: 1.5rem;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
-}
+    .stat-card {
+        background: linear-gradient(180deg, rgba(10, 25, 41, 0.9) 0%, rgba(10, 25, 41, 0.95) 100%);
+        border-radius: 18px;
+        padding: 1.5rem;
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
 
-/* Popover Enhancement */
-[data-testid="stPopover"] {
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15);
-}
+    .stat-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 35px rgba(0, 212, 255, 0.25);
+    }
 
-/* Chat Input Enhancement */
-[data-testid="stChatInput"] {
-    border-radius: 12px;
-    border: 2px solid #e2e8f0;
-    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
-}
+    .stat-label {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin-bottom: 0.75rem;
+    }
 
-[data-testid="stChatInput"]:focus-within {
-    border-color: #667eea;
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
-}
+    .stat-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin: 0;
+        color: #00D4FF;
+    }
 
-/* Select Box Enhancement */
-.stSelectbox > div > div {
-    border-radius: 10px;
-    border: 2px solid #e2e8f0;
-}
+    .stat-detail {
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 0.5rem;
+    }
 
-.stSelectbox > div > div:hover {
-    border-color: #cbd5e1;
-}
+    .section-title {
+        font-weight: 600;
+        color: #0A1929;
+        margin-bottom: 0.5rem;
+        letter-spacing: 0.03rem;
+    }
 
-/* Number Input Enhancement */
-.stNumberInput > div > div > input {
-    border-radius: 10px;
-    border: 2px solid #e2e8f0;
-}
-
-/* Text Area Enhancement */
-.stTextArea > div > div > textarea {
-    border-radius: 10px;
-    border: 2px solid #e2e8f0;
-}
+    .section-subtitle {
+        color: #4a5568;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Main Header
 st.markdown("""
 <div class="main-header">
-    <h1>⚡ Battery Pack SOH Prediction Platform</h1>
-    <h3>🔋 AI-Powered Battery Health Assessment</h3>
-    <p>🚀 State-of-the-art analytics, predictions, and an expert assistant — all in one app.</p>
+    <h1>🔋 Battery Pack SOH Prediction Platform</h1>
+    <h3>AI-Powered Battery Health Assessment</h3>
+    <p>State-of-the-art analytics, predictions, and an expert assistant — all in one app.</p>
 </div>
 """, unsafe_allow_html=True)
 
 # -------------------------------
-# Sidebar Configuration (styled)
+# Sidebar Configuration
 # -------------------------------
 with st.sidebar:
-    st.markdown("<div class='sidebar-section'><h3 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:700;'>⚙️ Configuration Panel</h3></div>", unsafe_allow_html=True)
-
-    # File Upload (styled card)
-    st.markdown("<div class='uploader-card'><h4 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:600;'>📁 Upload PulseBat Dataset</h4>", unsafe_allow_html=True)
+    st.markdown("## 🎛️ Configuration Panel")
+    
+    # File Upload
     uploaded_file = st.file_uploader(
-        "", 
+        "📁 Upload PulseBat Dataset", 
         type=["csv"],
         help="Upload your PulseBat dataset CSV file"
     )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Model Settings (grouped)
-    st.markdown("<div class='sidebar-section'><h4 style='margin:0 0 0.75rem 0; color:#1e293b; font-weight:600;'>🔧 Model Configuration</h4>", unsafe_allow_html=True)
-
+    
+    st.markdown("---")
+    
+    # Model Settings
+    st.markdown("### 🤖 Model Configuration")
+    
     # Preprocessing Options
     sort_method = st.selectbox(
-        "Cell Sorting Method:",
+        "📊 Cell Sorting Method:",
         ["None", "Ascending", "Descending"],
         help="Sort U1–U21 cell values for pattern analysis"
     )
-
+    
     # SOH Threshold
     threshold = st.slider(
-        "SOH Health Threshold:",
+        "⚡ SOH Health Threshold:",
         min_value=0.0, max_value=1.0, value=0.6, step=0.01,
         help="Threshold below which battery is considered unhealthy"
     )
-
+    
     # Advanced Settings
-    with st.expander("Advanced Settings"):
+    with st.expander("🔧 Advanced Settings"):
         test_size = st.slider("Train/Test Split", 0.1, 0.5, 0.2)
         cv_folds = st.number_input("Cross-Validation Folds", 3, 10, 5)
         random_state = st.number_input("Random State", 1, 100, 42)
+    
+    st.markdown("---")
 
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    st.markdown("### 🤖 AI Assistant Configuration")
+    st.caption("The embedded project API key is used automatically for chatbot responses.")
+
+    model_values = [choice[1] for choice in MODEL_CHOICES]
+    model_label_lookup = {value: label for label, value in MODEL_CHOICES}
+    current_model = st.session_state.get("model_choice", model_values[0])
+    try:
+        current_index = model_values.index(current_model)
+    except ValueError:
+        current_index = 0
+
+    selected_model = st.selectbox(
+        "Preferred GPT Model",
+        options=model_values,
+        index=current_index,
+        format_func=lambda value: model_label_lookup.get(value, value),
+        help=(
+            "Premium tier: up to 250k tokens/day on GPT-5.1, GPT-5.1-Codex, GPT-5, GPT-5-Codex, GPT-5-Chat-Latest,"
+            " GPT-4.1, GPT-4o, o1, o3."
+            " Efficiency tier: up to 2.5M tokens/day on GPT-5.1-Codex-Mini and other *mini/nano* variants."
+        ),
+    )
+    st.session_state.model_choice = selected_model
+    st.caption(f"Model selected: {model_label_lookup.get(selected_model, selected_model)}")
+    if selected_model not in CHAT_COMPATIBLE_MODELS:
+        st.warning(
+            f"{selected_model} uses the completions endpoint. Falling back to {DEFAULT_CHAT_MODEL} for chat responses.",
+            icon="⚠️",
+        )
 
 
 # -------------------------------
@@ -706,6 +679,9 @@ with st.sidebar:
 # -------------------------------
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+
+if "model_choice" not in st.session_state:
+    st.session_state.model_choice = DEFAULT_CHAT_MODEL
 
 # RAG Knowledge Base
 BATTERY_KNOWLEDGE_BASE = {
@@ -735,6 +711,17 @@ BATTERY_KNOWLEDGE_BASE = {
     }
 }
 
+@st.cache_data(show_spinner=False)
+def load_pulsebat_description():
+    """Read the local PulseBat dataset description file if present."""
+    description_path = Path(__file__).parent / "PulseBat Data Description.md"
+    if not description_path.exists():
+        return None
+    try:
+        return description_path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+
 def retrieve_relevant_context(user_query):
     """RAG: Retrieve relevant context based on user query"""
     query_lower = user_query.lower()
@@ -748,72 +735,178 @@ def retrieve_relevant_context(user_query):
     
     return " ".join(relevant_contexts) if relevant_contexts else ""
 
+
+def render_stat_cards(cards):
+    """Render responsive stat cards for hero metrics"""
+    card_html = '<div class="section-card"><div class="stat-grid">'
+    for card in cards:
+        card_html += textwrap.dedent(
+            f"""
+            <div class='stat-card'>
+                <p class='stat-label'>{card['label']}</p>
+                <p class='stat-value'>{card['value']}</p>
+                <p class='stat-detail'>{card['detail']}</p>
+            </div>
+            """
+        )
+    card_html += "</div></div>"
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
+def build_linear_regression_context(
+    model_results,
+    df,
+    u_cols,
+    threshold,
+    sort_method,
+    figures=None,
+    dataset_description=None,
+):
+    """Compile a comprehensive package of model, dataset, and visualization details for the AI assistant."""
+    train_metrics = model_results["train_metrics"]
+    test_metrics = model_results["test_metrics"]
+    cv_scores = model_results["cv_scores"]
+    cv_mean = float(np.mean(cv_scores)) if len(cv_scores) else float("nan")
+    cv_std = float(np.std(cv_scores)) if len(cv_scores) else float("nan")
+    train_metrics_serialized = {metric: float(value) for metric, value in train_metrics.items()}
+    test_metrics_serialized = {metric: float(value) for metric, value in test_metrics.items()}
+
+    feature_importance = (
+        pd.DataFrame({
+            "feature": model_results["feature_names"],
+            "coefficient": model_results["model"].coef_,
+        })
+        .assign(abs_coeff=lambda df_: df_["coefficient"].abs())
+        .sort_values("abs_coeff", ascending=False)
+        .drop(columns="abs_coeff")
+        .head(10)
+    )
+    coeff_lines = "\n".join(
+        f"    - {row.feature}: {row.coefficient:.5f}"
+        for row in feature_importance.itertuples()
+    ) or "    - (coefficients unavailable)"
+
+    # Provide a tiny snapshot for quick reading but attach the full dataset as CSV for the model context.
+    snapshot_cols = [col for col in u_cols[:5]] + ["Pack_SOH"]
+    snapshot_df = (
+        df[snapshot_cols]
+        .head(3)
+        .round(4)
+        .replace({np.nan: None})
+    )
+    snapshot_json = json.dumps(snapshot_df.to_dict(orient="records"), indent=2)
+
+    full_dataset_csv = df.round(6).to_csv(index=False)
+    dataset_metadata = {
+        "rows": int(len(df)),
+        "columns": list(df.columns),
+        "u_columns": list(u_cols),
+        "target_column": "Pack_SOH",
+    }
+
+    coefficients = {
+        feature: float(coef)
+        for feature, coef in zip(model_results["feature_names"], model_results["model"].coef_)
+    }
+
+    scaler = model_results.get("scaler")
+    scaler_payload = None
+    if scaler is not None and hasattr(scaler, "mean_"):
+        scaler_payload = {
+            "mean": [float(x) for x in np.atleast_1d(scaler.mean_)],
+            "scale": [float(x) for x in np.atleast_1d(getattr(scaler, "scale_", []))],
+            "var": [float(x) for x in np.atleast_1d(getattr(scaler, "var_", []))] if hasattr(scaler, "var_") else None,
+        }
+
+    visualization_payload = {}
+    if figures:
+        for label, fig in figures.items():
+            if fig is None:
+                continue
+            try:
+                visualization_payload[label] = fig.to_plotly_json()
+            except Exception as viz_error:
+                visualization_payload[label] = {"error": str(viz_error)}
+
+    summary_text = textwrap.dedent(
+        f"""
+        Linear Regression Context
+        - Sorting Method: {sort_method}
+        - Health Threshold: {threshold}
+        - Train Metrics: R²={train_metrics['R²']:.3f}, RMSE={train_metrics['RMSE']:.4f}, MAE={train_metrics['MAE']:.4f}
+        - Test Metrics: R²={test_metrics['R²']:.3f}, RMSE={test_metrics['RMSE']:.4f}, MAE={test_metrics['MAE']:.4f}
+        - Cross-Validation R²: mean={cv_mean:.3f}, std={cv_std:.3f}
+
+        Top Feature Coefficients:
+{coeff_lines}
+
+        Sample Pack Records (first 3 rows, subset of columns):
+{snapshot_json}
+        """
+    ).strip()
+
+    context_payload = {
+        "summary": summary_text,
+        "train_metrics": train_metrics_serialized,
+        "test_metrics": test_metrics_serialized,
+        "cv_scores": [float(x) for x in np.atleast_1d(cv_scores)],
+        "threshold": threshold,
+        "sort_method": sort_method,
+        "model_artifact": {
+            "type": "LinearRegression",
+            "intercept": float(np.squeeze(model_results["model"].intercept_)),
+            "coefficients": coefficients,
+            "feature_names": list(model_results["feature_names"]),
+            "scaler": scaler_payload,
+        },
+        "dataset": {
+            "metadata": dataset_metadata,
+            "csv": full_dataset_csv,
+        },
+        "visualizations": visualization_payload,
+    }
+
+    if dataset_description:
+        context_payload["dataset"]["documentation_markdown"] = dataset_description
+
+    return json.dumps(context_payload, indent=2, default=_json_default_serializer)
+
 # -------------------------------
 # Data Loading and Preprocessing
 # -------------------------------
 
-@st.cache_data
-def load_and_preprocess_data(file):
+@st.cache_data(show_spinner=False)
+def load_and_preprocess_data(file_bytes):
     """Load and preprocess the PulseBat dataset"""
-    with st.spinner("Loading and preprocessing data..."):
-        df = pd.read_csv(file)
-        
-        # Identify U1-U21 cell columns
-        u_cols = [col for col in df.columns if col.startswith("U") and col[1:].isdigit()]
-        u_cols = sorted(u_cols, key=lambda x: int(x[1:]))  # Sort U1, U2, ..., U21
-        
-        # Check if we have the expected U1-U21 columns
-        if len(u_cols) != 21:
-            st.warning(f"Expected 21 cell columns (U1-U21), found {len(u_cols)}: {u_cols}")
-        
-        # Create pack SOH by aggregating individual cell SOH values
-        # Using mean as the primary aggregation method
-        df["Pack_SOH_Mean"] = df[u_cols].mean(axis=1)
-        df["Pack_SOH_Median"] = df[u_cols].median(axis=1)
-        df["Pack_SOH_Min"] = df[u_cols].min(axis=1)
-        df["Pack_SOH_Max"] = df[u_cols].max(axis=1)
-        df["Pack_SOH_Std"] = df[u_cols].std(axis=1)
-        
-        # Use the existing SOH column as target (it represents pack SOH)
-        if 'SOH' in df.columns:
-            df["Pack_SOH"] = df["SOH"]
-        else:
-            df["Pack_SOH"] = df["Pack_SOH_Mean"]
-        
-        # Add data quality metrics
-        df["Missing_Cells"] = df[u_cols].isnull().sum(axis=1)
-        df["Cell_Range"] = df["Pack_SOH_Max"] - df["Pack_SOH_Min"]
-        df["Cell_Variance"] = df[u_cols].var(axis=1)
-        
-        return df, u_cols
-
-@st.cache_data
-def generate_sample_data():
-    """Generate sample data for demonstration"""
-    np.random.seed(42)
-    n_samples = 1000
+    file_buffer = io.BytesIO(file_bytes)
+    df = pd.read_csv(file_buffer)
     
-    # Generate U1-U21 columns with realistic battery cell voltages
-    data = {}
-    for i in range(1, 22):
-        # Simulate realistic battery cell voltages with some correlation
-        base_voltage = np.random.normal(3.5, 0.1, n_samples)
-        noise = np.random.normal(0, 0.02, n_samples)
-        data[f'U{i}'] = np.clip(base_voltage + noise, 3.0, 4.0)
+    # Identify U1-U21 cell columns
+    u_cols = [col for col in df.columns if col.startswith("U") and col[1:].isdigit()]
+    u_cols = sorted(u_cols, key=lambda x: int(x[1:]))  # Sort U1, U2, ..., U21
     
-    # Generate SOH based on cell voltages with realistic patterns
-    df = pd.DataFrame(data)
-    u_cols = [f'U{i}' for i in range(1, 22)]
+    # Check if we have the expected U1-U21 columns
+    if len(u_cols) != 21:
+        st.warning(f"⚠️ Expected 21 cell columns (U1-U21), found {len(u_cols)}: {u_cols}")
     
-    # Create realistic SOH values
-    cell_avg = df[u_cols].mean(axis=1)
-    soh_base = (cell_avg - 3.0) / 1.0  # Normalize to 0-1 range
-    soh_noise = np.random.normal(0, 0.05, n_samples)
-    df["SOH"] = np.clip(soh_base + soh_noise, 0.1, 1.0)
+    # Create pack SOH by aggregating individual cell SOH values
+    # Using mean as the primary aggregation method
+    df["Pack_SOH_Mean"] = df[u_cols].mean(axis=1)
+    df["Pack_SOH_Median"] = df[u_cols].median(axis=1)
+    df["Pack_SOH_Min"] = df[u_cols].min(axis=1)
+    df["Pack_SOH_Max"] = df[u_cols].max(axis=1)
+    df["Pack_SOH_Std"] = df[u_cols].std(axis=1)
     
-    # Add metadata
-    df["ID"] = range(1, n_samples + 1)
-    df["Mat"] = np.random.choice(['NMC', 'LiCoO2', 'LiFePO4'], n_samples)
+    # Use the existing SOH column as target (it represents pack SOH)
+    if 'SOH' in df.columns:
+        df["Pack_SOH"] = df["SOH"]
+    else:
+        df["Pack_SOH"] = df["Pack_SOH_Mean"]
+    
+    # Add data quality metrics
+    df["Missing_Cells"] = df[u_cols].isnull().sum(axis=1)
+    df["Cell_Range"] = df["Pack_SOH_Max"] - df["Pack_SOH_Min"]
+    df["Cell_Variance"] = df[u_cols].var(axis=1)
     
     return df, u_cols
 
@@ -839,6 +932,7 @@ def prepare_features(df, u_cols, sort_method):
 # Linear Regression Model Training
 # -------------------------------
 
+@st.cache_data(show_spinner=False)
 def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random_state):
     """Train Linear Regression model with comprehensive evaluation"""
     
@@ -909,9 +1003,9 @@ def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random
 def classify_battery_health(soh_value, threshold=0.6):
     """Classify battery health based on SOH threshold"""
     if soh_value < threshold:
-        return "The battery has a problem.", "bad"
+        return "⚠️ The battery has a problem.", "bad"
     else:
-        return "The battery is healthy.", "good"
+        return "✅ The battery is healthy.", "good"
 
 # -------------------------------
 # ChatGPT Integration
@@ -923,20 +1017,19 @@ def ask_chatgpt_rag(prompt, context_data=None, api_key=None):
     retrieved_context = retrieve_relevant_context(prompt)
     
     # Use internal API key if none provided
-    if api_key is None:
-        api_key = OPENAI_API_KEY
+    api_key = get_effective_api_key(api_key)
 
-        if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
-            # Fallback response using RAG knowledge base
-            if retrieved_context:
-                return f"""## RAG Knowledge Base Response
+    if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
+        # Fallback response using RAG knowledge base
+        if retrieved_context:
+            return f"""## 🧠 RAG Knowledge Base Response
 
 {retrieved_context}
 
 ---
 *Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
-            else:
-                return """## OpenAI API key not configured
+        else:
+            return """## ❌ OpenAI API key not configured
 
 Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
@@ -972,17 +1065,22 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
         
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_selected_model(),
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=500
+            max_completion_tokens=600
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"AI Assistant Error: {str(e)}"
+        error_text = str(e)
+        if "Incorrect API key" in error_text or "invalid_api_key" in error_text or "401" in error_text:
+            return """## 🔐 OpenAI Authentication Error
+
+The bundled API key was rejected by OpenAI. Update the `OPENAI_API_KEY` constant (or set the `OPENAI_API_KEY` environment variable) with a valid key that has access to your selected model, then rerun the app."""
+        return f"❌ AI Assistant Error: {error_text}"
 
 def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
     """Streaming RAG-enhanced ChatGPT integration"""
@@ -990,20 +1088,19 @@ def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
     retrieved_context = retrieve_relevant_context(prompt)
     
     # Use internal API key if none provided
-    if api_key is None:
-        api_key = OPENAI_API_KEY
+    api_key = get_effective_api_key(api_key)
 
     if not api_key or api_key == "YOUR_OPENAI_API_KEY_HERE":
         # Fallback response using RAG knowledge base
         if retrieved_context:
-            response = f"""## RAG Knowledge Base Response
+            response = f"""## 🧠 RAG Knowledge Base Response
 
 {retrieved_context}
 
 ---
 *Note: The OpenAI API key is not configured. Please set it in the code to enable enhanced AI responses.*"""
         else:
-            response = """## OpenAI API key not configured
+            response = """## ❌ OpenAI API key not configured
 
 Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
 
@@ -1047,13 +1144,13 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
         
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_selected_model(),
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=500,
+            max_completion_tokens=600,
             stream=True
         )
         
@@ -1062,30 +1159,30 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
                 yield chunk.choices[0].delta.content
                 
     except Exception as e:
-        yield f"AI Assistant Error: {str(e)}"
+        error_text = str(e)
+        if "Incorrect API key" in error_text or "invalid_api_key" in error_text or "401" in error_text:
+            yield """## 🔐 OpenAI Authentication Error
+
+The embedded OpenAI key is invalid. Update `OPENAI_API_KEY` in the code (or export `OPENAI_API_KEY`) with a working key, then restart the app."""
+        else:
+            yield f"❌ AI Assistant Error: {error_text}"
 
 def show_feedback_controls(message_index):
     """Shows the feedback control for assistant messages"""
     st.write("")
     
     with st.popover("How did I do?"):
-        with st.form(key=f"feedback-{message_index}", border=False):
-            with st.container(gap=None):
-                st.markdown(":small[Rating]")
-                rating = st.feedback(options="stars")
-
-            details = st.text_area("More information (optional)")
-
-            if st.checkbox("Include chat history with my feedback", True):
-                relevant_history = st.session_state.battery_messages[:message_index]
-            else:
-                relevant_history = []
-
-            ""  # Add some space
+        form_key = f"feedback-{message_index}"
+        with st.form(key=form_key, border=False):
+            rating = st.slider("Rate this response", 1, 5, 5, key=f"rating-{message_index}")
+            details = st.text_area("More information (optional)", key=f"details-{message_index}")
+            include_history = st.checkbox(
+                "Include chat history with my feedback", value=True, key=f"history-{message_index}"
+            )
 
             if st.form_submit_button("Send feedback"):
-                st.success("Thank you for your feedback!")
-                # TODO: Submit feedback here!
+                # In a full deployment, this is where we'd forward feedback to an analytics service.
+                st.success("Thank you for your feedback! 🎉")
 
 # -------------------------------
 # Visualizations
@@ -1180,148 +1277,173 @@ def create_visualizations(model_results, df):
 # Main Application Logic
 # -------------------------------
 
-# Note: Demo mode removed. Users must upload a dataset to proceed.
-# To re-enable demo mode, re-add a button that sets `uploaded_file = "demo"`.
-
 # Main application flow
 if uploaded_file is not None:
-    # Load data (demo or uploaded)
-    if uploaded_file == "demo":
-        df, u_cols = generate_sample_data()
-        st.success("Demo dataset loaded (1000 synthetic battery samples)")
-    else:
-        df, u_cols = load_and_preprocess_data(uploaded_file)
-        st.success("PulseBat dataset loaded successfully!")
+    try:
+        file_bytes = uploaded_file.getvalue()
+        with st.spinner("🔄 Loading and preprocessing dataset..."):
+            df, u_cols = load_and_preprocess_data(file_bytes)
+        st.success("✅ PulseBat dataset loaded successfully!")
+    except Exception as exc:
+        st.error(f"Unable to process the uploaded file: {exc}")
+        st.stop()
+
+    if not u_cols:
+        st.error("No valid U1-U21 cell columns were found in the dataset. Please upload a valid PulseBat file.")
+        st.stop()
+    if df.empty:
+        st.error("The uploaded dataset has no rows to analyze. Please provide a populated dataset.")
+        st.stop()
+
+    pack_soh_series = df["Pack_SOH"].dropna()
+    healthy_count = (pack_soh_series >= threshold).sum()
+    unhealthy_count = len(df) - healthy_count
+    healthy_ratio = (healthy_count / len(df) * 100) if len(df) else 0
+    avg_pack_soh = pack_soh_series.mean()
+    soh_min = pack_soh_series.min()
+    soh_max = pack_soh_series.max()
+    median_soh = pack_soh_series.median()
+    soh_std = pack_soh_series.std()
+    avg_cell_spread = df["Cell_Range"].fillna(0).mean()
+    missing_rows = int(df[u_cols].isnull().any(axis=1).sum())
+    total_missing_entries = int(df[u_cols].isnull().sum().sum())
+    rows_without_missing = len(df) - missing_rows
+    duplicate_rows = int(df.duplicated().sum())
+    zero_variance_cells = int((df[u_cols].std() == 0).sum())
+
+    stat_cards = [
+        {"label": "Total Samples", "value": f"{len(df):,}", "detail": "records analyzed"},
+        {"label": "Average SOH", "value": f"{avg_pack_soh:.3f}", "detail": "mean pack health"},
+        {"label": "Healthy Packs", "value": f"{healthy_ratio:.1f}%", "detail": f"{healthy_count:,} above threshold"},
+        {"label": "Voltage Spread", "value": f"{avg_cell_spread:.3f}", "detail": "avg cell variance"}
+    ]
+    render_stat_cards(stat_cards)
+    visualization_figures = {}
+    dataset_description_markdown = load_pulsebat_description()
     
+    # Prepare model insights once (cached)
+    try:
+        with st.spinner("🔄 Preparing linear regression insights..."):
+            model_results = train_linear_regression(
+                df, u_cols, sort_method, test_size, cv_folds, random_state
+            )
+    except Exception as exc:
+        st.error(f"Model training failed: {exc}")
+        st.stop()
+
     # Update sidebar stats
     with st.sidebar:
-        st.markdown("<div class='sidebar-section'>", unsafe_allow_html=True)
-        st.markdown("<h4 style='margin:0 0 1rem 0; color:#1e293b; font-weight:600;'>📊 Dataset Statistics</h4>", unsafe_allow_html=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("📦 Total Samples", f"{len(df):,}")
-            st.metric("🔋 Battery Cells", len(u_cols))
-            st.metric("✅ Healthy", f"{(df['Pack_SOH'] >= threshold).sum():,}")
-        with col2:
-            st.metric("📈 Avg SOH", f"{df['Pack_SOH'].mean():.3f}")
-            st.metric("📊 SOH Range", f"{df['Pack_SOH'].min():.2f}-{df['Pack_SOH'].max():.2f}")
-            st.metric("⚠️ Problems", f"{(len(df) - (df['Pack_SOH'] >= threshold).sum()):,}")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("### 📊 Dataset Statistics")
+        st.metric("Total Samples", len(df))
+        st.metric("Cell Feature Columns", len(u_cols))
+        st.metric("Median Pack SOH", f"{median_soh:.3f}")
+        st.metric("SOH Std Dev", f"{soh_std:.3f}")
+        st.metric("SOH Range", f"{soh_min:.3f} - {soh_max:.3f}")
+        st.metric("Rows w/ Missing Cells", missing_rows)
+        st.metric("Zero-Variance Cell Columns", zero_variance_cells)
     
     # Create tabs for different sections
-    tab1, tab2, tab3, tab4 = st.tabs(["Data Analysis", "Linear Regression", "Visualizations", "AI Assistant"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Data Analysis", "🤖 Linear Regression", "📈 Visualizations", "💬 AI Assistant"])
     
     with tab1:
-        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>📊 Comprehensive Data Analysis</h2>", unsafe_allow_html=True)
+        st.markdown("## 📊 Comprehensive Data Analysis")
         
-        col1, col2 = st.columns(2, gap="large")
+        col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📋 Dataset Overview</h3>", unsafe_allow_html=True)
-            st.dataframe(df.head(10), use_container_width=True, height=400)
+            st.markdown("### Dataset Overview")
+            show_full_dataset = st.toggle("Show entire dataset", value=False, key="show_full_dataset")
+            if show_full_dataset:
+                st.dataframe(df, use_container_width=True, height=420)
+            else:
+                max_preview = min(len(df), 200)
+                preview_rows = st.slider(
+                    "Rows to preview",
+                    min_value=5,
+                    max_value=max_preview,
+                    value=min(10, max_preview),
+                    step=5,
+                    key="preview_row_slider",
+                )
+                st.dataframe(df.head(preview_rows), use_container_width=True, height=420)
+            st.caption("Toggle to inspect the entire CSV or fine-tune the preview window.")
             
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔍 Data Quality Report</h3>", unsafe_allow_html=True)
+            st.markdown("### Data Quality Report")
             quality_metrics = {
-                "Missing Values": df[u_cols].isnull().sum().sum(),
-                "Complete Records": len(df) - df[u_cols].isnull().any(axis=1).sum(),
+                "Complete Rows": rows_without_missing,
+                "Duplicate Rows": duplicate_rows,
+                "Total Missing Cells": total_missing_entries,
                 "Avg Cell Voltage": df[u_cols].mean().mean(),
-                "Voltage Std Dev": df[u_cols].std().mean(),
-                "Cell Range": df["Cell_Range"].mean()
+                "Max Cell Range": df["Cell_Range"].max(),
+                "Avg Cell Variance": df["Cell_Variance"].mean(),
             }
             for metric, value in quality_metrics.items():
                 st.metric(metric, f"{value:.3f}" if isinstance(value, float) else value)
         
         with col2:
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📈 SOH Distribution Analysis</h3>", unsafe_allow_html=True)
+            st.markdown("### SOH Distribution Analysis")
             fig_hist = px.histogram(df, x="Pack_SOH", nbins=30, 
                                   title="Battery Pack SOH Distribution",
-                                  template="plotly_white",
-                                  color_discrete_sequence=['#667eea'])
-            fig_hist.update_layout(
-                title_font_size=16,
-                title_font_color='#1e293b',
-                title_font_family='Inter',
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)'
-            )
+                                  template="plotly_white")
+            visualization_figures["dataset_soh_distribution"] = fig_hist
             st.plotly_chart(fig_hist, use_container_width=True)
             
-            # Health classification stats
-            healthy_count = (df["Pack_SOH"] >= threshold).sum()
-            unhealthy_count = len(df) - healthy_count
-            
+            health_df = pd.DataFrame({
+                "status": ["Healthy", "Problematic"],
+                "count": [healthy_count, unhealthy_count],
+            })
             fig_pie = px.pie(
-                values=[healthy_count, unhealthy_count],
-                names=['Healthy', 'Problematic'],
+                health_df,
+                values="count",
+                names="status",
                 title=f"Battery Health Classification (Threshold: {threshold})",
-                color_discrete_sequence=['#10b981', '#ef4444']
+                color="status",
+                color_discrete_map={"Healthy": "#4CAF50", "Problematic": "#f44336"}
             )
-            fig_pie.update_layout(
-                title_font_size=16,
-                title_font_color='#1e293b',
-                title_font_family='Inter'
-            )
+            visualization_figures["health_classification_breakdown"] = fig_pie
             st.plotly_chart(fig_pie, use_container_width=True)
         
         # Cell correlation analysis
-        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔗 Cell Correlation Matrix</h3>", unsafe_allow_html=True)
+        st.markdown("### 🔥 Cell Correlation Matrix")
         corr_matrix = df[u_cols].corr()
         
         fig_heatmap = px.imshow(
             corr_matrix,
             title="Battery Cell Correlation Heatmap",
             template="plotly_white",
-            aspect="auto",
-            color_continuous_scale='RdBu_r'
+            aspect="auto"
         )
-        fig_heatmap.update_layout(
-            title_font_size=16,
-            title_font_color='#1e293b',
-            title_font_family='Inter'
-        )
+        visualization_figures["cell_correlation_heatmap"] = fig_heatmap
         st.plotly_chart(fig_heatmap, use_container_width=True)
     
     with tab2:
-        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>🤖 Linear Regression Model Training</h2>", unsafe_allow_html=True)
-        
-        with st.spinner("🔄 Training Linear Regression model..."):
-            model_results = train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random_state)
-        
-        st.success("✅ Linear Regression model trained successfully!")
+        st.markdown("## 🤖 Linear Regression Model Training")
+        st.success("✅ Linear Regression model ready! Cached for instant reuse.")
         
         # Performance metrics
-        col1, col2, col3 = st.columns(3, gap="large")
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>📚 Training Performance</h3>", unsafe_allow_html=True)
+            st.markdown("### 📈 Training Performance")
             train_metrics = model_results["train_metrics"]
             for metric, value in train_metrics.items():
-                delta = None
-                if metric == "R²":
-                    delta = f"{(value - 0.5) * 100:.1f}% vs baseline"
-                st.metric(f"🎯 Train {metric}", f"{value:.4f}", delta=delta)
+                st.metric(f"Train {metric}", f"{value:.4f}")
         
         with col2:
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>🎯 Test Performance</h3>", unsafe_allow_html=True)
+            st.markdown("### 🎯 Test Performance")
             test_metrics = model_results["test_metrics"]
             for metric, value in test_metrics.items():
-                delta = None
-                if metric == "R²":
-                    delta = f"{(value - 0.5) * 100:.1f}% vs baseline"
-                st.metric(f"📊 Test {metric}", f"{value:.4f}", delta=delta)
+                st.metric(f"Test {metric}", f"{value:.4f}")
         
         with col3:
-            st.markdown("<h3 style='color:#1e293b; font-weight:600; margin-bottom:1rem;'>✔️ Cross-Validation</h3>", unsafe_allow_html=True)
+            st.markdown("### 🔄 Cross-Validation")
             cv_mean = model_results["cv_scores"].mean()
             cv_std = model_results["cv_scores"].std()
-            st.metric("📈 CV R² Mean", f"{cv_mean:.4f}")
-            st.metric("📉 CV R² Std", f"{cv_std:.4f}")
-            st.metric("🔢 Folds", cv_folds)
+            st.metric("CV R² Mean", f"{cv_mean:.4f}")
+            st.metric("CV R² Std", f"{cv_std:.4f}")
         
         # Model interpretation
-        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>🔬 Model Interpretation</h3>", unsafe_allow_html=True)
+        st.markdown("### 🔍 Model Interpretation")
         
         # Feature importance (coefficients)
         feature_importance = pd.DataFrame({
@@ -1334,22 +1456,13 @@ if uploaded_file is not None:
             x='Coefficient', y='Feature',
             title="Top 15 Feature Coefficients (Linear Regression)",
             template="plotly_white",
-            orientation='h',
-            color='Coefficient',
-            color_continuous_scale='RdBu'
+            orientation='h'
         )
-        fig_importance.update_layout(
-            title_font_size=16,
-            title_font_color='#1e293b',
-            title_font_family='Inter',
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            showlegend=False
-        )
+        visualization_figures["feature_importance_bar"] = fig_importance
         st.plotly_chart(fig_importance, use_container_width=True)
         
         # Model summary
-        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>📝 Model Summary</h3>", unsafe_allow_html=True)
+        st.markdown("### 📋 Model Summary")
         st.markdown(f"""
         **Model Type:** Linear Regression  
         **Features:** {len(model_results["feature_names"])} cell voltages (U1-U21)  
@@ -1361,34 +1474,24 @@ if uploaded_file is not None:
         """)
     
     with tab3:
-        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>📊 Model Performance Visualizations</h2>", unsafe_allow_html=True)
+        st.markdown("## 📈 Model Performance Visualizations")
         
         # Create visualizations
         fig1, fig2, fig3 = create_visualizations(model_results, df)
-        
-        # Enhanced figure layouts
-        for fig in [fig1, fig2, fig3]:
-            fig.update_layout(
-                title_font_size=18,
-                title_font_color='#1e293b',
-                title_font_family='Inter',
-                title_font_weight=600,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font_family='Inter',
-                font_color='#475569'
-            )
+        visualization_figures["predicted_vs_actual"] = fig1
+        visualization_figures["residuals_scatter"] = fig2
+        visualization_figures["soh_distribution_model_tab"] = fig3
         
         st.plotly_chart(fig1, use_container_width=True)
         
-        col1, col2 = st.columns(2, gap="large")
+        col1, col2 = st.columns(2)
         with col1:
             st.plotly_chart(fig2, use_container_width=True)
         with col2:
             st.plotly_chart(fig3, use_container_width=True)
         
         # Additional analysis
-        st.markdown("<h3 style='color:#1e293b; font-weight:600; margin:2rem 0 1rem 0;'>📈 Additional Analysis</h3>", unsafe_allow_html=True)
+        st.markdown("### 📊 Additional Analysis")
         
         # Residuals distribution
         residuals = model_results["y_test"] - model_results["y_test_pred"]
@@ -1396,28 +1499,23 @@ if uploaded_file is not None:
             x=residuals,
             title="Distribution of Residuals",
             nbins=30,
-            template="plotly_white",
-            color_discrete_sequence=['#764ba2']
+            template="plotly_white"
         )
-        fig_residuals.update_layout(
-            title_font_size=16,
-            title_font_color='#1e293b',
-            title_font_family='Inter'
-        )
+        visualization_figures["residuals_histogram"] = fig_residuals
         st.plotly_chart(fig_residuals, use_container_width=True)
     
     with tab4:
         # Battery AI Assistant - Modern Chat Interface
-        st.markdown("<h2 style='color:#1e293b; font-weight:700; margin-bottom:1.5rem;'>🤖 Battery AI Assistant</h2>", unsafe_allow_html=True)
+        st.markdown("## 🔋 Battery AI Assistant")
         
         # Battery-specific suggestions
         BATTERY_SUGGESTIONS = {
-            "What is SOH prediction?": "What is State of Health (SOH) prediction and how does it work with battery cells?",
-            "Battery maintenance tips": "Give me comprehensive battery maintenance and care tips for longevity",
-            "Battery chemistry explained": "Explain different battery chemistries like NMC, LiFePO4 and their characteristics",
-            "Battery recycling importance": "Why is battery recycling important for sustainability?",
-            "Battery safety guidelines": "What are the key safety considerations when working with batteries?",
-            "Model performance analysis": "Analyze the current Linear Regression model performance and provide insights"
+            "🔋 What is SOH prediction?": "What is State of Health (SOH) prediction and how does it work with battery cells?",
+            "🛠️ Battery maintenance tips": "Give me comprehensive battery maintenance and care tips for longevity",
+            "⚗️ Battery chemistry explained": "Explain different battery chemistries like NMC, LiFePO4 and their characteristics",
+            "♻️ Battery recycling importance": "Why is battery recycling important for sustainability?",
+            "🛡️ Battery safety guidelines": "What are the key safety considerations when working with batteries?",
+            "📊 Model performance analysis": "Analyze the current Linear Regression model performance and provide insights"
         }
         
         # Initialize chat history
@@ -1444,10 +1542,19 @@ if uploaded_file is not None:
         # Show initial interface when no interaction
         if not user_first_interaction and not has_message_history:
             st.session_state.battery_messages = []
-
+            
             # RAG Status
+            st.markdown(
+                """
+                <div class="section-card">
+                    <h3 class="section-title">🚀 Start a conversation</h3>
+                    <p class="section-subtitle">Pick a curated topic or type your own question to tap into the battery expert assistant.</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
             st.info("🧠 **RAG System Active**: This chatbot uses Retrieval-Augmented Generation with a specialized battery knowledge base for enhanced responses.")
-
+            
             with st.container():
                 st.chat_input("Ask about batteries, SOH prediction, or maintenance...", key="initial_battery_question")
                 
@@ -1459,15 +1566,15 @@ if uploaded_file is not None:
                 )
             
             # Knowledge Base Topics
-            with st.expander("Available Knowledge Base Topics"):
+            with st.expander("📚 Available Knowledge Base Topics"):
                 st.markdown("""
                 **The RAG system can provide expert insights on:**
-                - **SOH Prediction**: State of Health analysis and prediction methods
-                - **Battery Maintenance**: Care tips and longevity best practices
-                - **Battery Chemistry**: NMC, LiFePO4, degradation mechanisms
-                - **Recycling & Sustainability**: Environmental impact and recycling processes
-                - **Safety**: Thermal management and protection measures
-                - **Model Performance**: Accuracy metrics and evaluation methods
+                - 🔋 **SOH Prediction**: State of Health analysis and prediction methods
+                - 🛠️ **Battery Maintenance**: Care tips and longevity best practices  
+                - ⚗️ **Battery Chemistry**: NMC, LiFePO4, degradation mechanisms
+                - ♻️ **Recycling & Sustainability**: Environmental impact and recycling processes
+                - 🛡️ **Safety**: Thermal management and protection measures
+                - 📊 **Model Performance**: Accuracy metrics and evaluation methods
                 """)
             
             st.stop()
@@ -1491,6 +1598,7 @@ if uploaded_file is not None:
             
             st.button(
                 "Restart",
+                icon="🔄",
                 on_click=clear_battery_conversation,
             )
         
@@ -1508,7 +1616,7 @@ if uploaded_file is not None:
         if user_message:
             # Display user message
             with st.chat_message("user"):
-                st.text(user_message)
+                st.markdown(user_message)
             
             # Display assistant response
             with st.chat_message("assistant"):
@@ -1525,18 +1633,18 @@ if uploaded_file is not None:
                         
                         health_status, health_class = classify_battery_health(prediction, threshold)
                         
-                        response = f"""## Battery SOH Prediction
+                        response = f"""## 🔮 Battery SOH Prediction
 
 **Predicted Pack SOH:** **{prediction:.3f}**  
 **Health Status:** {health_status}  
 
-### Model Details
+### 📈 Model Details
 - **Algorithm:** Linear Regression
 - **Test R² Score:** {model_results['test_metrics']['R²']:.3f}
 - **Test RMSE:** {model_results['test_metrics']['RMSE']:.3f}
 - **Health Threshold:** {threshold}
 
-### Dataset Context
+### 📊 Dataset Context
 - **Total Samples:** {len(df)} batteries
 - **SOH Range:** {df['Pack_SOH'].min():.3f} - {df['Pack_SOH'].max():.3f}
 - **Sorting Method:** {sort_method}
@@ -1551,13 +1659,15 @@ The model uses U1-U21 cell voltage data to predict overall battery pack health. 
                 else:
                     # Use streaming RAG system for other questions
                     with st.spinner("Researching battery knowledge..."):
-                        context_data = f"""Current Analysis Context:
-                        - Model: Linear Regression
-                        - Performance: R² = {model_results['test_metrics']['R²']:.3f}, RMSE = {model_results['test_metrics']['RMSE']:.3f}
-                        - Dataset: {len(df)} battery samples
-                        - SOH Range: {df['Pack_SOH'].min():.3f} - {df['Pack_SOH'].max():.3f}
-                        - Health Threshold: {threshold}
-                        - Sorting Method: {sort_method}"""
+                        context_data = build_linear_regression_context(
+                            model_results,
+                            df,
+                            u_cols,
+                            threshold,
+                            sort_method,
+                            figures=visualization_figures,
+                            dataset_description=dataset_description_markdown,
+                        )
                     
                     # Stream the response
                     response = st.write_stream(stream_chatgpt_rag(user_message, context_data))
@@ -1570,113 +1680,74 @@ The model uses U1-U21 cell voltage data to predict overall battery pack health. 
                 st.session_state.battery_messages.append({"role": "assistant", "content": response})
 
 else:
-    # Welcome Screen with Enhanced Design
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("""
-        <div style='text-align: center; padding: 2rem 0;'>
-            <h1 style='color:#1e293b; font-weight:800; font-size:2.5rem; margin-bottom:1rem;'>Welcome to Battery SOH Platform</h1>
-            <p style='color:#64748b; font-size:1.2rem; margin-bottom:2rem;'>Advanced AI-powered battery health prediction and analysis</p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    ## 🚀 Welcome to Battery Pack SOH Prediction Platform
     
-    # Feature Cards
-    st.markdown("<h2 style='color:#1e293b; font-weight:700; text-align:center; margin:2rem 0;'>🚀 Key Features</h2>", unsafe_allow_html=True)
+    ### Overview
     
-    col1, col2, col3 = st.columns(3, gap="large")
+    This platform delivers a comprehensive battery State of Health (SOH) prediction system using Linear Regression
+    plus an AI-powered assistant for expert analysis.
+    
+    ### Key Features
+    
+    🔋 **Battery SOH Prediction**: Upload your PulseBat dataset to predict State of Health using U1-U21 cell data
+    
+    🤖 **Linear Regression Model**: Advanced machine learning model with comprehensive evaluation metrics
+    
+    📊 **Data Preprocessing**: Multiple sorting techniques (None, Ascending, Descending) for cell data analysis
+    
+    ⚡ **Health Classification**: Configurable threshold-based classification (default: 0.6)
+    
+    📈 **Rich Visualizations**: Interactive charts showing predicted vs actual SOH, residuals, and distributions
+    
+    💬 **AI Assistant**: Expert assistant for battery insights and maintenance tips
+    
+    ### Getting Started:
+    1. 📁 Upload your PulseBat CSV file using the sidebar
+    2. ⚙️ Configure your model settings (sorting method, threshold, etc.)
+    3. 🎯 Explore the data analysis, model training, and visualizations
+    4. 💭 Chat with our AI assistant for insights and battery tips
+    
+    ---
+    
+    **Need sample data for testing? Reach out to the project team for an anonymized PulseBat extract.**
+    """)
+    
+    # Feature showcase
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("""
-        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(102,126,234,0.25); min-height: 300px;'>
-            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>🤖 Linear Regression</h3>
-            <ul style='line-height: 1.8;'>
-                <li>U1-U21 cell feature extraction</li>
-                <li>Multiple sorting techniques</li>
-                <li>Cross-validation analysis</li>
-                <li>Comprehensive metrics</li>
-                <li>Feature importance</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 🔬 Linear Regression
+        - U1-U21 cell feature extraction
+        - Multiple sorting techniques
+        - Cross-validation
+        - Comprehensive metrics
+        """)
     
     with col2:
         st.markdown("""
-        <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(240,147,251,0.25); min-height: 300px;'>
-            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>📊 Rich Analytics</h3>
-            <ul style='line-height: 1.8;'>
-                <li>Interactive visualizations</li>
-                <li>Correlation analysis</li>
-                <li>Distribution plots</li>
-                <li>Quality reports</li>
-                <li>Real-time insights</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 📊 Rich Analytics  
+        - Interactive visualizations
+        - Correlation analysis
+        - Distribution plots
+        - Quality reports
+        """)
     
     with col3:
         st.markdown("""
-        <div style='background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 2rem; border-radius: 16px; color: white; box-shadow: 0 10px 30px rgba(79,172,254,0.25); min-height: 300px;'>
-            <h3 style='margin:0 0 1rem 0; font-size:1.5rem;'>🧠 AI Assistant</h3>
-            <ul style='line-height: 1.8;'>
-                <li>Battery expertise</li>
-                <li>Model insights</li>
-                <li>Maintenance tips</li>
-                <li>Real-time analysis</li>
-                <li>RAG-enhanced responses</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Getting Started Section
-    st.markdown("<h2 style='color:#1e293b; font-weight:700; text-align:center; margin:3rem 0 2rem 0;'>🎯 Getting Started</h2>", unsafe_allow_html=True)
-    
-    col1, col2 = st.columns([1, 1], gap="large")
-    
-    with col1:
-        st.markdown("""
-        <div style='background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 2rem; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 8px 32px rgba(15,23,42,0.08);'>
-            <h3 style='color:#1e293b; font-weight:600; margin-bottom:1.5rem;'>📝 Steps to Follow</h3>
-            <ol style='line-height: 2; color:#475569; font-size:1.05rem;'>
-                <li><strong>Upload Dataset:</strong> Use the sidebar to upload your PulseBat CSV file</li>
-                <li><strong>Configure Settings:</strong> Adjust model parameters and thresholds</li>
-                <li><strong>Explore Analysis:</strong> View comprehensive data insights</li>
-                <li><strong>Train Model:</strong> Run Linear Regression prediction</li>
-                <li><strong>Chat with AI:</strong> Get expert battery guidance</li>
-            </ol>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style='background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); padding: 2rem; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 8px 32px rgba(15,23,42,0.08);'>
-            <h3 style='color:#1e293b; font-weight:600; margin-bottom:1.5rem;'>💡 What You'll Get</h3>
-            <ul style='line-height: 2; color:#475569; font-size:1.05rem;'>
-                <li><strong>Accurate Predictions:</strong> ML-powered SOH forecasting</li>
-                <li><strong>Visual Insights:</strong> Beautiful interactive charts</li>
-                <li><strong>Health Classification:</strong> Instant battery status</li>
-                <li><strong>Expert Guidance:</strong> AI-powered recommendations</li>
-                <li><strong>Export Ready:</strong> Downloadable reports</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Call to Action
-    st.markdown("<div style='height:2rem;'></div>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        st.markdown("""
-        <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; box-shadow: 0 10px 30px rgba(102,126,234,0.3);'>
-            <h3 style='color: white; margin: 0 0 0.5rem 0; font-weight:700;'>👈 Ready to Begin?</h3>
-            <p style='color: rgba(255,255,255,0.9); margin: 0; font-size:1.1rem;'>Upload your dataset using the sidebar</p>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 🤖 AI Assistant
+        - Battery expertise
+        - Model insights  
+        - Maintenance tips
+        - Real-time analysis
+        """)
 
 # Footer
-st.markdown("<div style='height:3rem;'></div>", unsafe_allow_html=True)
+st.markdown("---")
 st.markdown("""
-<div style="text-align: center; padding: 3rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin-top: 3rem; box-shadow: 0 10px 40px rgba(102,126,234,0.2);">
-    <h3 style="color: white; margin: 0 0 0.5rem 0; font-weight: 700; font-size: 1.5rem;">⚡ Battery Pack SOH Prediction Platform</h3>
-    <p style="color: rgba(255,255,255,0.95); margin: 0; font-size: 1.1rem;">Powered by Linear Regression, AI, and Advanced Analytics</p>
-    <p style="color: rgba(255,255,255,0.85); margin: 1rem 0 0 0; font-size: 0.95rem;">SOFE3370 Final Project - Group 18 | Built with ❤️ using Streamlit</p>
+<div style="text-align: center; color: #666; padding: 2rem;">
+    <p><strong>Battery Pack SOH Prediction Platform</strong></p>
+    <p>Linear Regression, rich analytics, and an AI assistant.</p>
 </div>
 """, unsafe_allow_html=True)
