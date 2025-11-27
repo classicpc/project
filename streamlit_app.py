@@ -25,6 +25,8 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
+# Cap the serialized context we send to the LLM so token limits are respected on every turn.
+MAX_ASSISTANT_CONTEXT_CHARS = 20000
 
 def _json_default_serializer(obj):
     """Convert numpy/pandas objects to JSON-safe primitives."""
@@ -114,8 +116,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Custom CSS for two-tone professional UI
+# Custom CSS for two-tone professional UI. Keeping it inline makes deployment easier than
+# shipping a separate stylesheet, which is handy for student projects.
 st.markdown(r"""
 <style>
     /* Import Premium Font */
@@ -204,6 +206,67 @@ st.markdown(r"""
     [data-testid="stSidebar"] h2 {
         color: #00D4FF !important;
         font-weight: 600;
+    }
+
+    .sidebar-section-heading {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #9EE8FF;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.75rem;
+    }
+
+    .sidebar-stat-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .sidebar-stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(0, 212, 255, 0.35);
+        border-radius: 16px;
+        padding: 0.9rem 1rem;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .sidebar-stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(0, 212, 255, 0.25);
+    }
+
+    .sidebar-stat-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: rgba(255, 255, 255, 0.72);
+        margin-bottom: 0.35rem;
+    }
+
+    .sidebar-stat-value {
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #5FE7FF;
+        margin: 0;
+    }
+
+    .sidebar-stat-detail {
+        font-size: 0.82rem;
+        color: rgba(255, 255, 255, 0.6);
+        margin: 0.15rem 0 0;
+    }
+
+    @media (max-width: 900px) {
+        .sidebar-stat-card {
+            padding: 0.8rem 0.9rem;
+        }
+
+        .sidebar-stat-value {
+            font-size: 1.4rem;
+        }
     }
     
     /* Chat Interface - Two Tone Design */
@@ -581,13 +644,13 @@ st.markdown(r"""
 
     .section-title {
         font-weight: 600;
-        color: #0A1929;
+        color: #000000;
         margin-bottom: 0.5rem;
         letter-spacing: 0.03rem;
     }
 
     .section-subtitle {
-        color: #4a5568;
+        color: #000000;
         margin-bottom: 1.5rem;
         font-size: 0.95rem;
     }
@@ -753,6 +816,30 @@ def render_stat_cards(cards):
     st.markdown(card_html, unsafe_allow_html=True)
 
 
+def render_sidebar_stats(stats):
+    """Render custom sidebar stat cards for improved readability."""
+    if not stats:
+        return
+
+    cards_html = ["<div class='sidebar-stat-grid'>"]
+    for stat in stats:
+        detail = stat.get("detail")
+        detail_html = f"<p class='sidebar-stat-detail'>{detail}</p>" if detail else ""
+        cards_html.append(
+            textwrap.dedent(
+                f"""
+                <div class='sidebar-stat-card'>
+                    <p class='sidebar-stat-label'>{stat['label']}</p>
+                    <p class='sidebar-stat-value'>{stat['value']}</p>
+                    {detail_html}
+                </div>
+                """
+            ).strip()
+        )
+    cards_html.append("</div>")
+    st.markdown("\n".join(cards_html), unsafe_allow_html=True)
+
+
 def build_linear_regression_context(
     model_results,
     df,
@@ -786,22 +873,30 @@ def build_linear_regression_context(
         for row in feature_importance.itertuples()
     ) or "    - (coefficients unavailable)"
 
-    # Provide a tiny snapshot for quick reading but attach the full dataset as CSV for the model context.
+    # Provide compact context snippets to stay within API limits.
     snapshot_cols = [col for col in u_cols[:5]] + ["Pack_SOH"]
     snapshot_df = (
         df[snapshot_cols]
-        .head(3)
+        .head(2)
         .round(4)
         .replace({np.nan: None})
     )
     snapshot_json = json.dumps(snapshot_df.to_dict(orient="records"), indent=2)
 
-    full_dataset_csv = df.round(6).to_csv(index=False)
     dataset_metadata = {
         "rows": int(len(df)),
         "columns": list(df.columns),
         "u_columns": list(u_cols),
         "target_column": "Pack_SOH",
+    }
+
+    # These quick aggregates are enough for the assistant to talk about the dataset
+    # without flooding the prompt with every row.
+    dataset_summary = {
+        "mean_soh": float(df["Pack_SOH"].mean()),
+        "median_soh": float(df["Pack_SOH"].median()),
+        "std_soh": float(df["Pack_SOH"].std()),
+        "healthy_ratio": float(((df["Pack_SOH"] >= threshold).sum() / len(df)) if len(df) else 0.0),
     }
 
     coefficients = {
@@ -818,15 +913,23 @@ def build_linear_regression_context(
             "var": [float(x) for x in np.atleast_1d(getattr(scaler, "var_", []))] if hasattr(scaler, "var_") else None,
         }
 
-    visualization_payload = {}
+    visualization_payload = []
     if figures:
         for label, fig in figures.items():
             if fig is None:
                 continue
+            title = None
             try:
-                visualization_payload[label] = fig.to_plotly_json()
-            except Exception as viz_error:
-                visualization_payload[label] = {"error": str(viz_error)}
+                title = getattr(fig.layout.title, "text", None)
+            except Exception:
+                title = None
+            visualization_payload.append(
+                {
+                    "label": label,
+                    "title": title,
+                    "has_data": True,
+                }
+            )
 
     summary_text = textwrap.dedent(
         f"""
@@ -861,15 +964,30 @@ def build_linear_regression_context(
         },
         "dataset": {
             "metadata": dataset_metadata,
-            "csv": full_dataset_csv,
+            "summary": dataset_summary,
+            "sample_rows": json.loads(snapshot_json),
         },
         "visualizations": visualization_payload,
     }
 
     if dataset_description:
-        context_payload["dataset"]["documentation_markdown"] = dataset_description
+        # Truncate the markdown so the downstream prompt stays under the LLM rate limits.
+        trimmed_doc = dataset_description.strip()
+        if len(trimmed_doc) > 1500:
+            trimmed_doc = trimmed_doc[:1500] + "\n... (truncated)"
+        context_payload["dataset"]["documentation_markdown"] = trimmed_doc
 
-    return json.dumps(context_payload, indent=2, default=_json_default_serializer)
+    context_json = json.dumps(context_payload, indent=2, default=_json_default_serializer)
+
+    if len(context_json) > MAX_ASSISTANT_CONTEXT_CHARS:
+        context_payload["dataset"].pop("sample_rows", None)
+        context_json = json.dumps(context_payload, indent=2, default=_json_default_serializer)
+
+    if len(context_json) > MAX_ASSISTANT_CONTEXT_CHARS:
+        reduced_payload = {"summary": summary_text}
+        context_json = json.dumps(reduced_payload, indent=2)
+
+    return context_json
 
 # -------------------------------
 # Data Loading and Preprocessing
@@ -878,6 +996,7 @@ def build_linear_regression_context(
 @st.cache_data(show_spinner=False)
 def load_and_preprocess_data(file_bytes):
     """Load and preprocess the PulseBat dataset"""
+    # Streamlit gives us bytes, so we wrap them in BytesIO before handing to pandas.
     file_buffer = io.BytesIO(file_bytes)
     df = pd.read_csv(file_buffer)
     
@@ -889,8 +1008,8 @@ def load_and_preprocess_data(file_bytes):
     if len(u_cols) != 21:
         st.warning(f"⚠️ Expected 21 cell columns (U1-U21), found {len(u_cols)}: {u_cols}")
     
-    # Create pack SOH by aggregating individual cell SOH values
-    # Using mean as the primary aggregation method
+    # Create pack SOH by aggregating individual cell SOH values.
+    # Using mean as the primary aggregation method keeps the logic transparent.
     df["Pack_SOH_Mean"] = df[u_cols].mean(axis=1)
     df["Pack_SOH_Median"] = df[u_cols].median(axis=1)
     df["Pack_SOH_Min"] = df[u_cols].min(axis=1)
@@ -920,6 +1039,7 @@ def prepare_features(df, u_cols, sort_method):
     
     # Apply sorting if selected
     if sort_method == "Ascending":
+        # Sorting each row lets us study voltage distribution independent of probe index.
         X = X.apply(lambda row: np.sort(row.values), axis=1, result_type="expand")
         X.columns = [f"U{i+1}_sorted_asc" for i in range(len(X.columns))]
     elif sort_method == "Descending":
@@ -950,7 +1070,7 @@ def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random
         X, y, test_size=test_size, random_state=random_state
     )
     
-    # Feature scaling
+    # Feature scaling keeps the coefficients comparable across all U columns.
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
@@ -963,7 +1083,7 @@ def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random
     y_train_pred = model.predict(X_train_scaled)
     y_test_pred = model.predict(X_test_scaled)
     
-    # Cross-validation
+    # Cross-validation reports how consistent the model is across different splits.
     cv_scores = cross_val_score(model, X_train_scaled, y_train, cv=cv_folds, scoring='r2')
     
     # Comprehensive metrics
@@ -1002,6 +1122,7 @@ def train_linear_regression(df, u_cols, sort_method, test_size, cv_folds, random
 
 def classify_battery_health(soh_value, threshold=0.6):
     """Classify battery health based on SOH threshold"""
+    # The emoji copy keeps the UI friendly while we explain the threshold decision.
     if soh_value < threshold:
         return "⚠️ The battery has a problem.", "bad"
     else:
@@ -1053,7 +1174,7 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
         
         Provide detailed, technical, and actionable insights about battery technology. Use markdown formatting with headers, bullet points, and code blocks when appropriate."""
         
-        # Combine retrieved context with current analysis context
+        # Combine retrieved context with current analysis context (model metadata, dataset stats, etc.).
         full_context = ""
         if retrieved_context:
             full_context += f"\n\nRetrieved Knowledge Base Context:\n{retrieved_context}"
@@ -1080,6 +1201,10 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
             return """## 🔐 OpenAI Authentication Error
 
 The bundled API key was rejected by OpenAI. Update the `OPENAI_API_KEY` constant (or set the `OPENAI_API_KEY` environment variable) with a valid key that has access to your selected model, then rerun the app."""
+        if "rate_limit" in error_text.lower() or "429" in error_text:
+            return """## 🚦 OpenAI Rate Limit Reached
+
+The last request exceeded the model's token-per-minute quota. Try again in a minute or reduce the dataset/model context (smaller CSV, lower sampling) so fewer tokens are sent."""
         return f"❌ AI Assistant Error: {error_text}"
 
 def stream_chatgpt_rag(prompt, context_data=None, api_key=None):
@@ -1132,7 +1257,7 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
         
         Provide detailed, technical, and actionable insights about battery technology. Use markdown formatting with headers, bullet points, and code blocks when appropriate."""
         
-        # Combine retrieved context with current analysis context
+        # Combine retrieved context with current analysis context to keep responses grounded.
         full_context = ""
         if retrieved_context:
             full_context += f"\n\nRetrieved Knowledge Base Context:\n{retrieved_context}"
@@ -1164,11 +1289,16 @@ Please set `OPENAI_API_KEY` at the top of the app for AI-powered responses.
             yield """## 🔐 OpenAI Authentication Error
 
 The embedded OpenAI key is invalid. Update `OPENAI_API_KEY` in the code (or export `OPENAI_API_KEY`) with a working key, then restart the app."""
+        elif "rate_limit" in error_text.lower() or "429" in error_text:
+            yield """## 🚦 OpenAI Rate Limit Reached
+
+This request exceeded the model's token quota. Please retry shortly or reduce the context size (smaller dataset upload, fewer advanced settings) before asking again."""
         else:
             yield f"❌ AI Assistant Error: {error_text}"
 
 def show_feedback_controls(message_index):
     """Shows the feedback control for assistant messages"""
+    # We keep this lightweight so it can sit under every assistant response without clutter.
     st.write("")
     
     with st.popover("How did I do?"):
@@ -1190,8 +1320,9 @@ def show_feedback_controls(message_index):
 
 def create_visualizations(model_results, df):
     """Create comprehensive visualizations"""
+    # We separate plotting into its own helper so tabs can re-use the same figures.
     
-    # 1. Predicted vs Actual SOH
+    # 1. Predicted vs Actual SOH compares the regression fit on train vs test.
     fig1 = go.Figure()
     
     # Training data
@@ -1232,7 +1363,7 @@ def create_visualizations(model_results, df):
         height=600
     )
     
-    # 2. Residuals Plot
+    # 2. Residual plot highlights any heteroscedasticity or bias.
     residuals_train = model_results["y_train"] - model_results["y_train_pred"]
     residuals_test = model_results["y_test"] - model_results["y_test_pred"]
     
@@ -1261,7 +1392,7 @@ def create_visualizations(model_results, df):
         height=400
     )
     
-    # 3. SOH Distribution
+    # 3. Overall SOH distribution gives the user a quick feel for the dataset health spread.
     fig3 = px.histogram(
         df, x="Pack_SOH", 
         title="Battery Pack SOH Distribution",
@@ -1279,6 +1410,7 @@ def create_visualizations(model_results, df):
 
 # Main application flow
 if uploaded_file is not None:
+    # Everything below this branch is data-driven, so we bail early if no CSV is present.
     try:
         file_bytes = uploaded_file.getvalue()
         with st.spinner("🔄 Loading and preprocessing dataset..."):
@@ -1333,14 +1465,17 @@ if uploaded_file is not None:
 
     # Update sidebar stats
     with st.sidebar:
-        st.markdown("### 📊 Dataset Statistics")
-        st.metric("Total Samples", len(df))
-        st.metric("Cell Feature Columns", len(u_cols))
-        st.metric("Median Pack SOH", f"{median_soh:.3f}")
-        st.metric("SOH Std Dev", f"{soh_std:.3f}")
-        st.metric("SOH Range", f"{soh_min:.3f} - {soh_max:.3f}")
-        st.metric("Rows w/ Missing Cells", missing_rows)
-        st.metric("Zero-Variance Cell Columns", zero_variance_cells)
+        st.markdown("<p class='sidebar-section-heading'>📊 Dataset Statistics</p>", unsafe_allow_html=True)
+        sidebar_stats = [
+            {"label": "Total Samples", "value": f"{len(df):,}", "detail": "records analyzed"},
+            {"label": "Cell Feature Columns", "value": f"{len(u_cols)}", "detail": "U-series inputs"},
+            {"label": "Median Pack SOH", "value": f"{median_soh:.3f}"},
+            {"label": "SOH Std Dev", "value": f"{soh_std:.3f}"},
+            {"label": "SOH Range", "value": f"{soh_min:.3f} – {soh_max:.3f}"},
+            {"label": "Rows w/ Missing Cells", "value": f"{missing_rows:,}"},
+            {"label": "Zero-Variance Cell Columns", "value": f"{zero_variance_cells}"},
+        ]
+        render_sidebar_stats(sidebar_stats)
     
     # Create tabs for different sections
     tab1, tab2, tab3, tab4 = st.tabs(["📊 Data Analysis", "🤖 Linear Regression", "📈 Visualizations", "💬 AI Assistant"])
@@ -1352,6 +1487,7 @@ if uploaded_file is not None:
         
         with col1:
             st.markdown("### Dataset Overview")
+            # Toggle allows laptops with limited VRAM to avoid rendering all 670 rows at once.
             show_full_dataset = st.toggle("Show entire dataset", value=False, key="show_full_dataset")
             if show_full_dataset:
                 st.dataframe(df, use_container_width=True, height=420)
@@ -1623,7 +1759,7 @@ if uploaded_file is not None:
                 # Check if it's a prediction request
                 if any(keyword in user_message.lower() for keyword in ["soh", "predict", "analyze", "health"]):
                     with st.spinner("Analyzing battery data..."):
-                        # Select a random sample for prediction
+                        # Select a random sample for prediction to simulate live pack analysis.
                         sample_idx = np.random.randint(0, len(df))
                         sample_data = df.iloc[sample_idx]
                         
