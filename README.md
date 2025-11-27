@@ -2,7 +2,6 @@
 
 Interactive Streamlit app for analyzing PulseBat battery-pack data, training a linear-regression SOH model, and chatting with an AI battery assistant. Built as the SOFE3370 Final Project (Group 18).
 
-![Battery dashboard screenshot](https://user-images.githubusercontent.com/placeholder/battery-dashboard.png)
 
 ---
 
@@ -106,6 +105,6 @@ Open the provided localhost URL (default `http://localhost:8501`).
 
 ## 🙌 Credits
 
-Created by **Group 18** – Pranav Ashok Chaudhari, Tarun Modekurty, Leela Alagala, Hannah Albi – for the SOFE3370 Final Project, 2025.
+Created by **Group 18** – Pranav Ashok Chaudhari, Tarun Modekurty, Leela Alagala, Hannah Albi, Vandan Patel – for the SOFE3370 Final Project, 2025.
 
 Licensed under the MIT License. PRs and feature requests welcome!
