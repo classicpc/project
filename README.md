@@ -2,6 +2,8 @@
 
 Interactive Streamlit app for analyzing PulseBat battery-pack data, training a linear-regression SOH model, and chatting with an AI battery assistant. Built as the SOFE3370 Final Project (Group 18).
 
+[Open the live app](https://algo-project.streamlit.app/)
+
 
 ---
 
